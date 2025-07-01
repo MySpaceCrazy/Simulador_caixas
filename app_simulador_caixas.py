@@ -36,25 +36,38 @@ def agrupar_produtos(df_base, df_pos_fixa, volume_maximo, peso_maximo):
         caixas = []
         caixa_atual = {"produtos": [], "volume": 0.0, "peso": 0.0}
 
+
         for prod in produtos:
             volume_prod = prod["Volume de carga"]
             peso_prod = prod["Peso de carga"]
             qtd_total = prod["Qtd.prev.orig.UMA"]
             unidade_alt = prod["Unidade med.altern."]
-
+        
             if prod["Unidade de peso"] == "G":
                 peso_prod /= 1000
-
+        
             qtd_total = int(qtd_total) if not pd.isna(qtd_total) else 0
-
+        
             for i in range(qtd_total):
-                if (caixa_atual["volume"] + volume_prod > volume_maximo) or (caixa_atual["peso"] + peso_prod > peso_maximo):
+                precisa_nova_caixa = False
+        
+                if unidade_alt == "PAC":
+                    # PAC não pode ser quebrado: cada PAC inteiro precisa caber em uma caixa sozinho
+                    if (volume_prod > volume_maximo) or (peso_prod > peso_maximo):
+                        st.warning(f"O produto {prod['ID_Produto']} - {prod['Descrição_produto']} em PAC excede o limite de uma caixa. Verifique os parâmetros.")
+                    precisa_nova_caixa = (caixa_atual["volume"] + volume_prod > volume_maximo) or (caixa_atual["peso"] + peso_prod > peso_maximo)
+                else:
+                    # Para UN, tentar ocupar o máximo da caixa antes de abrir outra
+                    precisa_nova_caixa = (caixa_atual["volume"] + volume_prod > volume_maximo) or (caixa_atual["peso"] + peso_prod > peso_maximo)
+        
+                if precisa_nova_caixa:
                     caixas.append(caixa_atual)
                     caixa_atual = {"produtos": [], "volume": 0.0, "peso": 0.0}
-
+        
                 caixa_atual["produtos"].append(prod)
                 caixa_atual["volume"] += volume_prod
                 caixa_atual["peso"] += peso_prod
+
 
         if caixa_atual["produtos"]:
             caixas.append(caixa_atual)
