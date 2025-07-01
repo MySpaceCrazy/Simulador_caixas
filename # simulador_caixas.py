@@ -10,7 +10,7 @@ import pytz
 
 st.set_page_config(
     page_title="Simulador de Geração de Caixas por Loja e Braço",
-    page_icon="https://raw.githubusercontent.com/MySpaceCrazy/Simulador_Operacional/refs/heads/main/simulador_icon.ico",
+    page_icon="https://raw.githubusercontent.com/MySpaceCrazy/Simulador_caixas/refs/heads/main/simulador_icon.ico",
     layout="wide"
 )
 
