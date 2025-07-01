@@ -26,6 +26,8 @@ with col3:
 # --- Função principal ---
 def agrupar_produtos(df_base, df_pos_fixa, volume_maximo, peso_maximo):
     resultado = []
+def agrupar_produtos(df_base, df_pos_fixa, volume_maximo, peso_maximo):
+    resultado = []
     caixas_geradas = 0
 
     df_base["Volume de carga"] = pd.to_numeric(df_base["Volume de carga"], errors="coerce")
@@ -34,61 +36,58 @@ def agrupar_produtos(df_base, df_pos_fixa, volume_maximo, peso_maximo):
     for (loja, braco), grupo in df_base.merge(df_pos_fixa, on="ID_Produto").groupby(["ID_Loja", "Braço"]):
         produtos = grupo.to_dict(orient="records")
         caixas = []
-        caixa_atual = {"produtos": [], "volume": 0.0, "peso": 0.0}
-
+        caixa_atual = {"produtos": defaultdict(int), "volume": 0.0, "peso": 0.0}
 
         for prod in produtos:
             volume_prod = prod["Volume de carga"]
             peso_prod = prod["Peso de carga"]
             qtd_total = prod["Qtd.prev.orig.UMA"]
             unidade_alt = prod["Unidade med.altern."]
-        
+
             if prod["Unidade de peso"] == "G":
                 peso_prod /= 1000
-        
+
             qtd_total = int(qtd_total) if not pd.isna(qtd_total) else 0
-        
-            for i in range(qtd_total):
+
+            for _ in range(qtd_total):
                 precisa_nova_caixa = False
-        
+
                 if unidade_alt == "PAC":
-                    # PAC não pode ser quebrado: cada PAC inteiro precisa caber em uma caixa sozinho
                     if (volume_prod > volume_maximo) or (peso_prod > peso_maximo):
                         st.warning(f"O produto {prod['ID_Produto']} - {prod['Descrição_produto']} em PAC excede o limite de uma caixa. Verifique os parâmetros.")
                     precisa_nova_caixa = (caixa_atual["volume"] + volume_prod > volume_maximo) or (caixa_atual["peso"] + peso_prod > peso_maximo)
                 else:
-                    # Para UN, tentar ocupar o máximo da caixa antes de abrir outra
                     precisa_nova_caixa = (caixa_atual["volume"] + volume_prod > volume_maximo) or (caixa_atual["peso"] + peso_prod > peso_maximo)
-        
+
                 if precisa_nova_caixa:
                     caixas.append(caixa_atual)
-                    caixa_atual = {"produtos": [], "volume": 0.0, "peso": 0.0}
-        
-                caixa_atual["produtos"].append(prod)
+                    caixa_atual = {"produtos": defaultdict(int), "volume": 0.0, "peso": 0.0}
+
+                caixa_atual["produtos"][prod["ID_Produto"]] += 1
                 caixa_atual["volume"] += volume_prod
                 caixa_atual["peso"] += peso_prod
-
 
         if caixa_atual["produtos"]:
             caixas.append(caixa_atual)
 
         for cx in caixas:
             caixas_geradas += 1
-            for item in cx["produtos"]:
+            for id_prod, qtd in cx["produtos"].items():
+                item = next(prod for prod in produtos if prod["ID_Produto"] == id_prod)
                 resultado.append({
                     "ID_Loja": loja,
                     "Braço": braco,
                     "ID_Caixa": f"{loja}_{braco}_{caixas_geradas}",
-                    "ID_Produto": item["ID_Produto"],
+                    "ID_Produto": id_prod,
                     "Descrição_produto": item["Descrição_produto"],
-                    "Qtd_solicitada(UN)": item["Qtd solicitada (UN)"],
+                    "Qtd_separada(UN)": qtd,
                     "Volume_produto(L)": item["Volume de carga"],
                     "Peso_produto(KG)": item["Peso de carga"],
                     "Volume_caixa_total(L)": cx["volume"],
                     "Peso_caixa_total(KG)": cx["peso"]
                 })
-    return pd.DataFrame(resultado)
 
+    return pd.DataFrame(resultado)
 
 # Inicializa memória da sessão
 if "df_resultado" not in st.session_state:
