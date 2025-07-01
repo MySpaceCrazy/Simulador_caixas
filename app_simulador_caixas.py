@@ -76,21 +76,37 @@ def agrupar_produtos(df_base, df_pos_fixa, volume_maximo, peso_maximo):
                 })
     return pd.DataFrame(resultado)
 
+
+# Inicializa memória da sessão
+if "df_resultado" not in st.session_state:
+    st.session_state.df_resultado = None
+if "arquivo_atual" not in st.session_state:
+    st.session_state.arquivo_atual = None
+
+# Se o usuário carregar novo arquivo, atualiza e zera o resultado antigo
+if arquivo is not None and arquivo != st.session_state.arquivo_atual:
+    st.session_state.arquivo_atual = arquivo
+    st.session_state.df_resultado = None
+
+arquivo_usado = st.session_state.arquivo_atual
+
 # --- Execução ---
-if arquivo is not None:
+if arquivo_usado is not None:
     try:
-        df_base = pd.read_excel(arquivo, sheet_name="Base")
-        df_pos_fixa = pd.read_excel(arquivo, sheet_name="Pos.Fixa")
+        df_base = pd.read_excel(arquivo_usado, sheet_name="Base")
+        df_pos_fixa = pd.read_excel(arquivo_usado, sheet_name="Pos.Fixa")
 
         if st.button("🚀 Gerar Caixas"):
             df_resultado = agrupar_produtos(df_base, df_pos_fixa, volume_maximo, peso_maximo)
-
+            st.session_state.df_resultado = df_resultado
             st.success(f"Simulação concluída. Total de caixas geradas: {df_resultado['ID_Caixa'].nunique()}")
-            st.dataframe(df_resultado)
+
+        if st.session_state.df_resultado is not None:
+            st.dataframe(st.session_state.df_resultado)
 
             buffer = io.BytesIO()
             with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
-                df_resultado.to_excel(writer, sheet_name="Resumo Caixas", index=False)
+                st.session_state.df_resultado.to_excel(writer, sheet_name="Resumo Caixas", index=False)
 
             st.download_button(
                 label="📥 Baixar Relatório Excel",
