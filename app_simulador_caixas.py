@@ -26,8 +26,6 @@ with col3:
 # --- Função principal ---
 def agrupar_produtos(df_base, df_pos_fixa, volume_maximo, peso_maximo):
     resultado = []
-def agrupar_produtos(df_base, df_pos_fixa, volume_maximo, peso_maximo):
-    resultado = []
     caixas_geradas = 0
 
     df_base["Volume de carga"] = pd.to_numeric(df_base["Volume de carga"], errors="coerce")
