@@ -1,16 +1,13 @@
-# simulador_caixas.py
-
 import streamlit as st
 import pandas as pd
 import io
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
-import pytz
 
 st.set_page_config(
     page_title="Simulador de Geração de Caixas por Loja e Braço",
-    page_icon="https://raw.githubusercontent.com/MySpaceCrazy/Simulador_caixas/refs/heads/main/simulador_icon.ico",
+    page_icon="https://raw.githubusercontent.com/MySpaceCrazy/Simulador_Operacional/refs/heads/main/simulador_icon.ico",
     layout="wide"
 )
 
@@ -24,17 +21,18 @@ with col1:
 with col2:
     peso_maximo = st.number_input("⚖️ Peso máximo por caixa (KG)", value=15.0, step=0.1)
 with col3:
-    arquivo = st.file_uploader("📂 Selecionar arquivo de simulação", type=["xlsx"])
+    arquivo = st.file_uploader("📂 Selecionar arquivo de simulação (.xlsx)", type=["xlsx"])
 
-# --- Função de agrupar produtos ---
+# --- Função principal ---
 def agrupar_produtos(df_base, df_pos_fixa, volume_maximo, peso_maximo):
     resultado = []
     caixas_geradas = 0
 
-    # Agrupar por loja e braço
+    df_base["Volume de carga"] = pd.to_numeric(df_base["Volume de carga"], errors="coerce")
+    df_base["Peso de carga"] = pd.to_numeric(df_base["Peso de carga"], errors="coerce")
+
     for (loja, braco), grupo in df_base.merge(df_pos_fixa, on="ID_Produto").groupby(["ID_Loja", "Braço"]):
         produtos = grupo.to_dict(orient="records")
-        
         caixas = []
         caixa_atual = {"produtos": [], "volume": 0.0, "peso": 0.0}
 
@@ -43,17 +41,17 @@ def agrupar_produtos(df_base, df_pos_fixa, volume_maximo, peso_maximo):
             peso_prod = prod["Peso de carga"]
             qtd_total = prod["Qtd.prev.orig.UMA"]
             unidade_alt = prod["Unidade med.altern."]
-            
-            # Caso precise validar unidade de peso para converter G → KG (se necessário)
-            if prod["Unidade de peso"] == "G":
-                peso_prod /= 1000  
 
-            # PAC não pode ser dividido
-            for i in range(int(qtd_total)):
+            if prod["Unidade de peso"] == "G":
+                peso_prod /= 1000
+
+            qtd_total = int(qtd_total) if not pd.isna(qtd_total) else 0
+
+            for i in range(qtd_total):
                 if (caixa_atual["volume"] + volume_prod > volume_maximo) or (caixa_atual["peso"] + peso_prod > peso_maximo):
                     caixas.append(caixa_atual)
                     caixa_atual = {"produtos": [], "volume": 0.0, "peso": 0.0}
-                
+
                 caixa_atual["produtos"].append(prod)
                 caixa_atual["volume"] += volume_prod
                 caixa_atual["peso"] += peso_prod
@@ -61,7 +59,6 @@ def agrupar_produtos(df_base, df_pos_fixa, volume_maximo, peso_maximo):
         if caixa_atual["produtos"]:
             caixas.append(caixa_atual)
 
-        # Salvar resultado
         for cx in caixas:
             caixas_geradas += 1
             for item in cx["produtos"]:
@@ -79,24 +76,28 @@ def agrupar_produtos(df_base, df_pos_fixa, volume_maximo, peso_maximo):
                 })
     return pd.DataFrame(resultado)
 
-# --- Botão para processar ---
+# --- Execução ---
 if arquivo is not None:
-    df_base = pd.read_excel(arquivo, sheet_name="Base")
-    df_pos_fixa = pd.read_excel(arquivo, sheet_name="Pos.Fixa")
+    try:
+        df_base = pd.read_excel(arquivo, sheet_name="Base")
+        df_pos_fixa = pd.read_excel(arquivo, sheet_name="Pos.Fixa")
 
-    if st.button("🚀 Gerar Caixas"):
-        df_resultado = agrupar_produtos(df_base, df_pos_fixa, volume_maximo, peso_maximo)
-        
-        st.success(f"Simulação concluída. Total de caixas geradas: {df_resultado['ID_Caixa'].nunique()}")
-        st.dataframe(df_resultado)
+        if st.button("🚀 Gerar Caixas"):
+            df_resultado = agrupar_produtos(df_base, df_pos_fixa, volume_maximo, peso_maximo)
 
-        buffer = io.BytesIO()
-        with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
-            df_resultado.to_excel(writer, sheet_name="Resumo Caixas", index=False)
-        
-        st.download_button(
-            label="📥 Baixar relatório Excel",
-            data=buffer.getvalue(),
-            file_name="Simulacao_Caixas.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+            st.success(f"Simulação concluída. Total de caixas geradas: {df_resultado['ID_Caixa'].nunique()}")
+            st.dataframe(df_resultado)
+
+            buffer = io.BytesIO()
+            with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
+                df_resultado.to_excel(writer, sheet_name="Resumo Caixas", index=False)
+
+            st.download_button(
+                label="📥 Baixar Relatório Excel",
+                data=buffer.getvalue(),
+                file_name="Simulacao_Caixas.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+
+    except Exception as e:
+        st.error(f"Erro no processamento: {e}")
