@@ -79,7 +79,6 @@ def agrupar_produtos(df_base, volume_maximo, peso_maximo, ignorar_braco, convert
             id_prod = prod["ID_Produto"]
             descricao = prod["Descrição_produto"]
 
-            # Conversão PAC para UN se permitido, mas não quebrar PAC internamente
             pac_tamanho = 1
             if converter_pac_para_un and unidade_alt == "PAC":
                 pac_tamanho = int(qtd_restante)
@@ -94,7 +93,6 @@ def agrupar_produtos(df_base, volume_maximo, peso_maximo, ignorar_braco, convert
                     max_un_peso = int((peso_maximo - cx["peso"]) // peso_unit) if peso_unit > 0 else qtd_restante
                     max_unidades = min(qtd_restante, max_un_volume, max_un_peso)
 
-                    # Se PAC, só aloca PAC inteiro
                     if unidade_alt == "PAC" and max_unidades >= 1:
                         max_unidades = 1
                     elif unidade_alt == "PAC":
@@ -154,6 +152,22 @@ if arquivo_usado is not None:
             df_resultado = agrupar_produtos(df_base.copy(), st.session_state.volume_maximo, st.session_state.peso_maximo, ignorar_braco, converter_pac_para_un)
             st.session_state.df_resultado = df_resultado
             st.success(f"Simulação concluída. Total de caixas geradas: {df_resultado['ID_Caixa'].nunique()}")
+
+            # --- Comparativo com sistema original ---
+            if "ID_Caixa" in df_base.columns:
+                col_comp = ["ID_Loja"] if ignorar_braco else ["ID_Loja", "Braço"]
+
+                comparativo_sistema = df_base.drop_duplicates(subset=col_comp + ["ID_Caixa"])
+                comparativo_sistema = comparativo_sistema.groupby(col_comp).agg(Caixas_Sistema=("ID_Caixa", "nunique")).reset_index()
+
+                gerado = st.session_state.df_resultado.drop_duplicates(subset=col_comp + ["ID_Caixa"])
+                comparativo_gerado = gerado.groupby(col_comp).agg(Caixas_App=("ID_Caixa", "nunique")).reset_index()
+
+                comparativo = pd.merge(comparativo_sistema, comparativo_gerado, on=col_comp, how="outer").fillna(0)
+                comparativo["Diferença"] = comparativo["Caixas_App"] - comparativo["Caixas_Sistema"]
+
+                st.subheader("📊 Comparativo de Caixas por Loja e Braço")
+                st.dataframe(comparativo)
 
         if st.session_state.df_resultado is not None:
             st.dataframe(st.session_state.df_resultado)
