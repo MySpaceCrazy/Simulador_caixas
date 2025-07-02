@@ -205,7 +205,18 @@ if arquivo_usado is not None:
 
         if st.session_state.df_resultado is not None:
             st.dataframe(st.session_state.df_resultado)
-
+            
+            # Relatório de eficiência das caixas
+            
+            df_caixas = st.session_state.df_resultado.drop_duplicates(subset=["ID_Caixa", "Volume_caixa_total(L)", "Peso_caixa_total(KG)"])
+            media_volume = (df_caixas["Volume_caixa_total(L)"].mean() / st.session_state.volume_maximo) * 100
+            media_peso = (df_caixas["Peso_caixa_total(KG)"].mean() / st.session_state.peso_maximo) * 100
+        
+            st.info(f"📈 Eficiência média das caixas:\n"
+                    f"• Volume utilizado: {media_volume:.1f}%\n"
+                    f"• Peso utilizado: {media_peso:.1f}%")
+            
+            
             buffer = io.BytesIO()
             with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
                 st.session_state.df_resultado.to_excel(writer, sheet_name="Resumo Caixas", index=False)
