@@ -26,6 +26,8 @@ with col3:
 # --- Função principal ---
 def agrupar_produtos(df_base, df_pos_fixa, volume_maximo, peso_maximo):
     resultado = []
+def agrupar_produtos(df_base, df_pos_fixa, volume_maximo, peso_maximo):
+    resultado = []
     caixas_geradas = 0
 
     df_base["Volume de carga"] = pd.to_numeric(df_base["Volume de carga"], errors="coerce")
@@ -35,9 +37,9 @@ def agrupar_produtos(df_base, df_pos_fixa, volume_maximo, peso_maximo):
 
     for (loja, braco), grupo in dados_agrupados.groupby(["ID_Loja", "Braço"]):
         caixas = []
-        caixa_atual = {"produtos": [], "volume": 0.0, "peso": 0.0}
+        caixa_atual = {"produtos": defaultdict(lambda: {"Qtd_separada(UN)": 0, "Volume_produto(L)": 0, "Peso_produto(KG)": 0, "Descrição_produto": ""}),
+                       "volume": 0.0, "peso": 0.0}
 
-        # Agrupar por produto
         for _, prod in grupo.iterrows():
             volume_prod = prod["Volume de carga"]
             peso_prod = prod["Peso de carga"]
@@ -50,55 +52,53 @@ def agrupar_produtos(df_base, df_pos_fixa, volume_maximo, peso_maximo):
             qtd_total = int(qtd_total) if not pd.isna(qtd_total) else 0
 
             while qtd_total > 0:
-                # Se PAC não pode dividir dentro da mesma caixa
                 unidade_para_adicionar = 1 if unidade_alt != "PAC" else min(qtd_total, 1)
-
                 total_volume = volume_prod * unidade_para_adicionar
                 total_peso = peso_prod * unidade_para_adicionar
 
                 if (caixa_atual["volume"] + total_volume > volume_maximo) or (caixa_atual["peso"] + total_peso > peso_maximo):
                     if caixa_atual["produtos"]:
                         caixas_geradas += 1
-                        for item in caixa_atual["produtos"]:
+                        for id_prod, dados in caixa_atual["produtos"].items():
                             resultado.append({
                                 "ID_Loja": loja,
                                 "Braço": braco,
                                 "ID_Caixa": f"{loja}_{braco}_{caixas_geradas}",
-                                "ID_Produto": item["ID_Produto"],
-                                "Descrição_produto": item["Descrição_produto"],
-                                "Qtd_separada(UN)": item["Qtd_separada(UN)"],
-                                "Volume_produto(L)": item["Volume_produto(L)"],
-                                "Peso_produto(KG)": item["Peso_produto(KG)"],
+                                "ID_Produto": id_prod,
+                                "Descrição_produto": dados["Descrição_produto"],
+                                "Qtd_separada(UN)": dados["Qtd_separada(UN)"],
+                                "Volume_produto(L)": dados["Volume_produto(L)"],
+                                "Peso_produto(KG)": dados["Peso_produto(KG)"],
                                 "Volume_caixa_total(L)": caixa_atual["volume"],
                                 "Peso_caixa_total(KG)": caixa_atual["peso"]
                             })
-                    # Nova caixa
-                    caixa_atual = {"produtos": [], "volume": 0.0, "peso": 0.0}
+                    caixa_atual = {"produtos": defaultdict(lambda: {"Qtd_separada(UN)": 0, "Volume_produto(L)": 0, "Peso_produto(KG)": 0, "Descrição_produto": ""}),
+                                   "volume": 0.0, "peso": 0.0}
 
-                # Adiciona na caixa
-                caixa_atual["produtos"].append({
-                    "ID_Produto": prod["ID_Produto"],
-                    "Descrição_produto": prod["Descrição_produto"],
-                    "Qtd_separada(UN)": unidade_para_adicionar,
-                    "Volume_produto(L)": volume_prod,
-                    "Peso_produto(KG)": peso_prod
-                })
+                # Consolidando o produto dentro da caixa atual
+                item = caixa_atual["produtos"][prod["ID_Produto"]]
+                item["Qtd_separada(UN)"] += unidade_para_adicionar
+                item["Volume_produto(L)"] = volume_prod
+                item["Peso_produto(KG)"] = peso_prod
+                item["Descrição_produto"] = prod["Descrição_produto"]
+
                 caixa_atual["volume"] += total_volume
                 caixa_atual["peso"] += total_peso
                 qtd_total -= unidade_para_adicionar
 
+        # Salvar última caixa
         if caixa_atual["produtos"]:
             caixas_geradas += 1
-            for item in caixa_atual["produtos"]:
+            for id_prod, dados in caixa_atual["produtos"].items():
                 resultado.append({
                     "ID_Loja": loja,
                     "Braço": braco,
                     "ID_Caixa": f"{loja}_{braco}_{caixas_geradas}",
-                    "ID_Produto": item["ID_Produto"],
-                    "Descrição_produto": item["Descrição_produto"],
-                    "Qtd_separada(UN)": item["Qtd_separada(UN)"],
-                    "Volume_produto(L)": item["Volume_produto(L)"],
-                    "Peso_produto(KG)": item["Peso_produto(KG)"],
+                    "ID_Produto": id_prod,
+                    "Descrição_produto": dados["Descrição_produto"],
+                    "Qtd_separada(UN)": dados["Qtd_separada(UN)"],
+                    "Volume_produto(L)": dados["Volume_produto(L)"],
+                    "Peso_produto(KG)": dados["Peso_produto(KG)"],
                     "Volume_caixa_total(L)": caixa_atual["volume"],
                     "Peso_caixa_total(KG)": caixa_atual["peso"]
                 })
