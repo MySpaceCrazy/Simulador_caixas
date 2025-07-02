@@ -17,9 +17,9 @@ st.title("📦 Simulador de Caixas por Loja e Braço")
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    volume_maximo = st.number_input("🔲 Volume máximo por caixa (Litros)", value=40.0, step=0.1)
+    volume_maximo = st.number_input("🔲 Volume máximo por caixa (Litros)", value=50.0, step=0.1)
 with col2:
-    peso_maximo = st.number_input("⚖️ Peso máximo por caixa (KG)", value=15.0, step=0.1)
+    peso_maximo = st.number_input("⚖️ Peso máximo por caixa (KG)", value=20.0, step=0.1)
 with col3:
     arquivo = st.file_uploader("📂 Selecionar arquivo de simulação (.xlsx)", type=["xlsx"])
 
