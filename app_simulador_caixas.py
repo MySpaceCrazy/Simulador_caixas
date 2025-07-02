@@ -73,30 +73,19 @@ def agrupar_produtos(df_base, volume_maximo, peso_maximo):
                 alocado = False
 
                 for cx in caixas:
-                    if unidade_alt == "PAC":
-                        if (cx["volume"] + volume_unit <= volume_maximo) and (cx["peso"] + peso_unit <= peso_maximo):
-                            cx["volume"] += volume_unit
-                            cx["peso"] += peso_unit
-                            cx["produtos"][id_prod]["Qtd"] += 1
-                            cx["produtos"][id_prod]["Volume"] += volume_unit
-                            cx["produtos"][id_prod]["Peso"] += peso_unit
-                            alocado = True
-                            qtd_restante -= 1
-                            break
-                    else:
-                        max_un_volume = int((volume_maximo - cx["volume"]) // volume_unit) if volume_unit > 0 else qtd_restante
-                        max_un_peso = int((peso_maximo - cx["peso"]) // peso_unit) if peso_unit > 0 else qtd_restante
-                        max_unidades = min(qtd_restante, max_un_volume, max_un_peso)
+                    max_un_volume = int((volume_maximo - cx["volume"]) // volume_unit) if volume_unit > 0 else qtd_restante
+                    max_un_peso = int((peso_maximo - cx["peso"]) // peso_unit) if peso_unit > 0 else qtd_restante
+                    max_unidades = min(qtd_restante, max_un_volume, max_un_peso)
 
-                        if max_unidades > 0:
-                            cx["volume"] += volume_unit * max_unidades
-                            cx["peso"] += peso_unit * max_unidades
-                            cx["produtos"][id_prod]["Qtd"] += max_unidades
-                            cx["produtos"][id_prod]["Volume"] += volume_unit * max_unidades
-                            cx["produtos"][id_prod]["Peso"] += peso_unit * max_unidades
-                            qtd_restante -= max_unidades
-                            alocado = True
-                            break
+                    if max_unidades > 0:
+                        cx["volume"] += volume_unit * max_unidades
+                        cx["peso"] += peso_unit * max_unidades
+                        cx["produtos"][id_prod]["Qtd"] += max_unidades
+                        cx["produtos"][id_prod]["Volume"] += volume_unit * max_unidades
+                        cx["produtos"][id_prod]["Peso"] += peso_unit * max_unidades
+                        qtd_restante -= max_unidades
+                        alocado = True
+                        break
 
                 if not alocado:
                     nova_caixa = {
@@ -133,7 +122,7 @@ def agrupar_produtos(df_base, volume_maximo, peso_maximo):
 if arquivo_usado is not None:
     try:
         df_base = pd.read_excel(arquivo_usado, sheet_name="Base")
-        df_pos_fixa = pd.read_excel(arquivo_usado, sheet_name="Pos.Fixa")  # compatível, mas não utilizado diretamente
+        df_pos_fixa = pd.read_excel(arquivo_usado, sheet_name="Pos.Fixa")
 
         if st.button("🚀 Gerar Caixas"):
             st.session_state.volume_maximo = volume_temp
@@ -143,7 +132,6 @@ if arquivo_usado is not None:
             st.session_state.df_resultado = df_resultado
             st.success(f"Simulação concluída. Total de caixas geradas: {df_resultado['ID_Caixa'].nunique()}")
 
-            # --- Comparativo com sistema original ---
             if "ID_Caixa" in df_base.columns:
                 original = df_base.dropna(subset=["ID_Caixa"])
                 comparativo_sistema = original.groupby(["ID_Loja", "Braço"])["ID_Caixa"].nunique().reset_index(name="Caixas_Sistema")
