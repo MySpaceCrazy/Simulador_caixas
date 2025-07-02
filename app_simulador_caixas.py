@@ -1,4 +1,4 @@
-Script - Simulador Caixas - versão 1.6
+#Script - Simulador Caixas - versão 1.6
 
 import streamlit as st
 import pandas as pd
