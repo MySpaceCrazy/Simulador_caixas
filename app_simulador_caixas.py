@@ -13,19 +13,34 @@ st.set_page_config(
 
 st.title("📦 Simulador de Caixas por Loja e Braço")
 
+# --- Inicializa sessão ---
+if "df_resultado" not in st.session_state:
+    st.session_state.df_resultado = None
+if "arquivo" not in st.session_state:
+    st.session_state.arquivo = None
+if "volume_maximo" not in st.session_state:
+    st.session_state.volume_maximo = 50.0
+if "peso_maximo" not in st.session_state:
+    st.session_state.peso_maximo = 20.0
+
 # --- Parâmetros ---
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    volume_maximo = st.number_input("🔲 Volume máximo por caixa (Litros)", value=50.0, step=0.1)
+    volume_maximo = st.number_input("🔲 Volume máximo por caixa (Litros)", value=st.session_state.volume_maximo, step=0.1)
 with col2:
-    peso_maximo = st.number_input("⚖️ Peso máximo por caixa (KG)", value=20.0, step=0.1)
+    peso_maximo = st.number_input("⚖️ Peso máximo por caixa (KG)", value=st.session_state.peso_maximo, step=0.1)
 with col3:
     arquivo = st.file_uploader("📂 Selecionar arquivo de simulação (.xlsx)", type=["xlsx"])
 
-# --- Função principal ---
-def agrupar_produtos(df_base, df_pos_fixa, volume_maximo, peso_maximo):
-    resultado = []
+# Atualiza estado dos parâmetros
+st.session_state.volume_maximo = volume_maximo
+st.session_state.peso_maximo = peso_maximo
+
+if arquivo is not None:
+    st.session_state.arquivo = arquivo
+
+# --- Função de Agrupamento ---
 def agrupar_produtos(df_base, df_pos_fixa, volume_maximo, peso_maximo):
     resultado = []
     caixas_geradas = 0
@@ -103,43 +118,31 @@ def agrupar_produtos(df_base, df_pos_fixa, volume_maximo, peso_maximo):
 
     return pd.DataFrame(resultado)
 
-# Inicializa memória da sessão
-if "df_resultado" not in st.session_state:
-    st.session_state.df_resultado = None
-if "arquivo_atual" not in st.session_state:
-    st.session_state.arquivo_atual = None
-
-# Se o usuário carregar novo arquivo, atualiza e zera o resultado antigo
-if arquivo is not None and arquivo != st.session_state.arquivo_atual:
-    st.session_state.arquivo_atual = arquivo
-    st.session_state.df_resultado = None
-
-arquivo_usado = st.session_state.arquivo_atual
-
-# --- Execução ---
-if arquivo_usado is not None:
+# --- Botão para gerar caixas ---
+if st.session_state.arquivo is not None:
     try:
-        df_base = pd.read_excel(arquivo_usado, sheet_name="Base")
-        df_pos_fixa = pd.read_excel(arquivo_usado, sheet_name="Pos.Fixa")
+        df_base = pd.read_excel(st.session_state.arquivo, sheet_name="Base")
+        df_pos_fixa = pd.read_excel(st.session_state.arquivo, sheet_name="Pos.Fixa")
 
         if st.button("🚀 Gerar Caixas"):
             df_resultado = agrupar_produtos(df_base, df_pos_fixa, volume_maximo, peso_maximo)
             st.session_state.df_resultado = df_resultado
             st.success(f"Simulação concluída. Total de caixas geradas: {df_resultado['ID_Caixa'].nunique()}")
 
-        if st.session_state.df_resultado is not None:
-            st.dataframe(st.session_state.df_resultado)
-
-            buffer = io.BytesIO()
-            with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
-                st.session_state.df_resultado.to_excel(writer, sheet_name="Resumo Caixas", index=False)
-
-            st.download_button(
-                label="📥 Baixar Relatório Excel",
-                data=buffer.getvalue(),
-                file_name="Simulacao_Caixas.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
-
     except Exception as e:
-        st.error(f"Erro no processamento: {e}")
+        st.error(f"Erro ao processar o arquivo: {e}")
+
+# --- Exibe resultado se existir ---
+if st.session_state.df_resultado is not None:
+    st.dataframe(st.session_state.df_resultado)
+
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
+        st.session_state.df_resultado.to_excel(writer, sheet_name="Resumo Caixas", index=False)
+
+    st.download_button(
+        label="📥 Baixar Relatório Excel",
+        data=buffer.getvalue(),
+        file_name="Simulacao_Caixas.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
