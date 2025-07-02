@@ -31,7 +31,13 @@ with col2:
 with col3:
     arquivo = st.file_uploader("📂 Selecionar arquivo de simulação (.xlsx)", type=["xlsx"])
 
-# Se o usuário carregar novo arquivo, atualiza e zera o resultado antigo
+# Opções de Flexibilidade
+col4, col5 = st.columns(2)
+with col4:
+    ignorar_braco = st.checkbox("🔃 Ignorar braço ao agrupar caixas", value=False)
+with col5:
+    converter_pac_para_un = st.checkbox("🔄 Converter PAC para UN para otimização", value=False)
+
 if arquivo is not None and arquivo != st.session_state.arquivo_atual:
     st.session_state.arquivo_atual = arquivo
     st.session_state.df_resultado = None
@@ -39,7 +45,7 @@ if arquivo is not None and arquivo != st.session_state.arquivo_atual:
 arquivo_usado = st.session_state.arquivo_atual
 
 # --- Função principal ---
-def agrupar_produtos(df_base, volume_maximo, peso_maximo):
+def agrupar_produtos(df_base, volume_maximo, peso_maximo, ignorar_braco, converter_pac_para_un):
     resultado = []
     caixa_id_global = 1
 
@@ -49,16 +55,20 @@ def agrupar_produtos(df_base, volume_maximo, peso_maximo):
 
     df_base.loc[df_base["Unidade de peso"] == "G", "Peso de carga"] /= 1000
 
-    df_base["Braço"] = df_base["Layout"] if "Layout" in df_base.columns else df_base["Braço"]
+    agrupadores = ["ID_Loja"]
+    if not ignorar_braco and "Braço" in df_base.columns:
+        agrupadores.append("Braço")
 
-    grupos = df_base.groupby([
-        "ID_Loja", "Braço", "ID_Produto", "Descrição_produto",
-        "Volume de carga", "Peso de carga", "Unidade med.altern."
-    ], dropna=False)["Qtd.prev.orig.UMA"].sum().reset_index()
+    grupos = df_base.groupby(
+        agrupadores + ["ID_Produto", "Descrição_produto", "Volume de carga", "Peso de carga", "Unidade med.altern."]
+    )[["Qtd.prev.orig.UMA"]].sum().reset_index()
 
     grupos = grupos.sort_values(by=["Volume de carga", "Peso de carga"], ascending=False)
 
-    for (loja, braco), grupo in grupos.groupby(["ID_Loja", "Braço"]):
+    for keys, grupo in grupos.groupby(agrupadores):
+        loja = keys if isinstance(keys, str) else keys[0]
+        braco = keys[1] if not ignorar_braco and len(keys) > 1 else "Todos"
+
         caixas = []
 
         for _, prod in grupo.iterrows():
@@ -69,6 +79,13 @@ def agrupar_produtos(df_base, volume_maximo, peso_maximo):
             id_prod = prod["ID_Produto"]
             descricao = prod["Descrição_produto"]
 
+            # Conversão PAC para UN se permitido, mas não quebrar PAC internamente
+            pac_tamanho = 1
+            if converter_pac_para_un and unidade_alt == "PAC":
+                pac_tamanho = int(qtd_restante)
+                qtd_restante *= pac_tamanho
+                unidade_alt = "UN"
+
             while qtd_restante > 0:
                 alocado = False
 
@@ -76,6 +93,12 @@ def agrupar_produtos(df_base, volume_maximo, peso_maximo):
                     max_un_volume = int((volume_maximo - cx["volume"]) // volume_unit) if volume_unit > 0 else qtd_restante
                     max_un_peso = int((peso_maximo - cx["peso"]) // peso_unit) if peso_unit > 0 else qtd_restante
                     max_unidades = min(qtd_restante, max_un_volume, max_un_peso)
+
+                    # Se PAC, só aloca PAC inteiro
+                    if unidade_alt == "PAC" and max_unidades >= 1:
+                        max_unidades = 1
+                    elif unidade_alt == "PAC":
+                        continue
 
                     if max_unidades > 0:
                         cx["volume"] += volume_unit * max_unidades
@@ -128,20 +151,9 @@ if arquivo_usado is not None:
             st.session_state.volume_maximo = volume_temp
             st.session_state.peso_maximo = peso_temp
 
-            df_resultado = agrupar_produtos(df_base.copy(), st.session_state.volume_maximo, st.session_state.peso_maximo)
+            df_resultado = agrupar_produtos(df_base.copy(), st.session_state.volume_maximo, st.session_state.peso_maximo, ignorar_braco, converter_pac_para_un)
             st.session_state.df_resultado = df_resultado
             st.success(f"Simulação concluída. Total de caixas geradas: {df_resultado['ID_Caixa'].nunique()}")
-
-            if "ID_Caixa" in df_base.columns:
-                original = df_base.dropna(subset=["ID_Caixa"])
-                comparativo_sistema = original.groupby(["ID_Loja", "Braço"])["ID_Caixa"].nunique().reset_index(name="Caixas_Sistema")
-
-                gerado = df_resultado.groupby(["ID_Loja", "Braço"])["ID_Caixa"].nunique().reset_index(name="Caixas_App")
-
-                comparativo = pd.merge(comparativo_sistema, gerado, on=["ID_Loja", "Braço"], how="outer").fillna(0)
-                comparativo["Diferença"] = comparativo["Caixas_App"] - comparativo["Caixas_Sistema"]
-                st.subheader("📊 Comparativo de Caixas por Loja e Braço")
-                st.dataframe(comparativo)
 
         if st.session_state.df_resultado is not None:
             st.dataframe(st.session_state.df_resultado)
