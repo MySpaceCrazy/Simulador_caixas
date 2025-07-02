@@ -161,7 +161,7 @@ if arquivo_usado is not None:
     try:
         df_base = pd.read_excel(arquivo_usado, sheet_name="Base")
 
-        if st.button("🚀 Gerar Caixas (Comparar FFD x BFD)"):
+        if st.button("🚀 Gerar Caixas (FFD x BFD)"):
             st.session_state.volume_maximo = volume_temp
             st.session_state.peso_maximo = peso_temp
 
