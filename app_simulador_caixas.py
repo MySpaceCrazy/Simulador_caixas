@@ -1,4 +1,4 @@
-# Simulador de Geração de Caixas - Versão 2.3
+# Simulador de Geração de Caixas - Versão 2.4
 
 import streamlit as st
 import pandas as pd
@@ -8,7 +8,7 @@ from collections import defaultdict
 # --- Configuração inicial do Streamlit ---
 st.set_page_config(
     page_title="Simulador de Geração de Caixas por Loja e Braço",
-    page_icon="https://raw.githubusercontent.com/MySpaceCrazy/Simulador_Operacional/refs/heads/main/simulador_icon.ico",
+    page_icon="📦",
     layout="wide"
 )
 
@@ -39,31 +39,34 @@ with col4:
 with col5:
     converter_pac_para_un = st.checkbox("🔄 Converter PAC para UN para otimização", value=False)
 
-# Detecta troca de arquivo
+# Detecta troca de arquivo e reseta resultados
 if arquivo is not None and arquivo != st.session_state.arquivo_atual:
     st.session_state.arquivo_atual = arquivo
     st.session_state.df_resultado = None
 
 arquivo_usado = st.session_state.arquivo_atual
 
-# --- Função de empacotamento ---
+# --- Função principal de empacotamento ---
 def empacotar(df_base, volume_max, peso_max, ignorar_braco, converter_pac_para_un, metodo="FFD"):
     resultado = []
     caixa_id_global = 1
 
+    # Normaliza dados numéricos
     df_base["Peso de carga"] = pd.to_numeric(df_base["Peso de carga"], errors="coerce").fillna(0)
     df_base["Volume de carga"] = pd.to_numeric(df_base["Volume de carga"], errors="coerce").fillna(0)
     df_base["Qtd.prev.orig.UMA"] = pd.to_numeric(df_base["Qtd.prev.orig.UMA"], errors="coerce").fillna(1)
     df_base.loc[df_base["Unidade de peso"] == "G", "Peso de carga"] /= 1000
 
-    # Corrige: calcula unitário
+    # Corrige: Calcula volume e peso unitário
     df_base["Volume unitário"] = df_base["Volume de carga"] / df_base["Qtd.prev.orig.UMA"]
     df_base["Peso unitário"] = df_base["Peso de carga"] / df_base["Qtd.prev.orig.UMA"]
 
+    # Agrupadores
     agrupadores = ["ID_Loja"]
     if not ignorar_braco and "Braço" in df_base.columns:
         agrupadores.append("Braço")
 
+    # Agrupamento dos produtos
     grupos = df_base.groupby(
         agrupadores + ["ID_Produto", "Descrição_produto", "Volume unitário", "Peso unitário", "Unidade med.altern."]
     )[["Qtd.prev.orig.UMA"]].sum().reset_index()
@@ -71,8 +74,11 @@ def empacotar(df_base, volume_max, peso_max, ignorar_braco, converter_pac_para_u
     grupos = grupos.sort_values(by=["Volume unitário", "Peso unitário"], ascending=False)
 
     for keys, grupo in grupos.groupby(agrupadores):
-        loja = keys if isinstance(keys, str) else keys[0]
-        braco = keys[1] if not ignorar_braco and len(keys) > 1 else "Todos"
+        if not ignorar_braco and len(keys) > 1:
+            loja, braco = keys
+        else:
+            loja = keys if isinstance(keys, str) else keys[0]
+            braco = "Todos"
 
         caixas = []
 
@@ -121,8 +127,9 @@ def empacotar(df_base, volume_max, peso_max, ignorar_braco, converter_pac_para_u
                     cx["produtos"][id_prod]["Peso"] += peso_unit * max_unidades
                     qtd_restante -= max_unidades
                 else:
+                    id_caixa_prefixo = f"{loja}" if ignorar_braco else f"{loja}_{braco}"
                     nova_caixa = {
-                        "ID_Caixa": f"{loja}_{braco}_{caixa_id_global}",
+                        "ID_Caixa": f"{id_caixa_prefixo}_{caixa_id_global}",
                         "ID_Loja": loja,
                         "Braço": braco,
                         "volume": 0.0,
@@ -154,14 +161,16 @@ def empacotar(df_base, volume_max, peso_max, ignorar_braco, converter_pac_para_u
 # --- Execução Principal ---
 if arquivo_usado is not None:
     try:
+        df_base = pd.read_excel(arquivo_usado, sheet_name="Base")
+
         if st.button("🚀 Gerar Caixas (Comparar FFD x BFD)"):
             st.session_state.volume_maximo = volume_temp
             st.session_state.peso_maximo = peso_temp
 
-            df_base = pd.read_excel(arquivo_usado, sheet_name="Base")
-
-            df_ffd = empacotar(df_base.copy(), st.session_state.volume_maximo, st.session_state.peso_maximo, ignorar_braco, converter_pac_para_un, metodo="FFD")
-            df_bfd = empacotar(df_base.copy(), st.session_state.volume_maximo, st.session_state.peso_maximo, ignorar_braco, converter_pac_para_un, metodo="BFD")
+            df_ffd = empacotar(df_base.copy(), st.session_state.volume_maximo, st.session_state.peso_maximo,
+                               ignorar_braco, converter_pac_para_un, metodo="FFD")
+            df_bfd = empacotar(df_base.copy(), st.session_state.volume_maximo, st.session_state.peso_maximo,
+                               ignorar_braco, converter_pac_para_un, metodo="BFD")
 
             total_ffd = df_ffd["ID_Caixa"].nunique()
             total_bfd = df_bfd["ID_Caixa"].nunique()
@@ -177,16 +186,14 @@ if arquivo_usado is not None:
 
             st.success(f"🏆 Melhor resultado: {metodo_usado} com {st.session_state.df_resultado['ID_Caixa'].nunique()} caixas.")
 
-            # Eficiência
+            # Relatório de Eficiência
             df_caixas = st.session_state.df_resultado.drop_duplicates(subset=["ID_Caixa", "Volume_caixa_total(L)", "Peso_caixa_total(KG)"])
             media_volume = (df_caixas["Volume_caixa_total(L)"].mean() / st.session_state.volume_maximo) * 100
             media_peso = (df_caixas["Peso_caixa_total(KG)"].mean() / st.session_state.peso_maximo) * 100
 
-            st.info(f"📈 Eficiência média das caixas:\n"
-                    f"• Volume utilizado: {media_volume:.1f}%\n"
-                    f"• Peso utilizado: {media_peso:.1f}%")
+            st.info(f"📈 Eficiência média das caixas:\n• Volume: {media_volume:.1f}%\n• Peso: {media_peso:.1f}%")
 
-            # Comparativo com sistema (se houver coluna ID_Caixa)
+            # Comparativo com sistema original
             if "ID_Caixa" in df_base.columns:
                 col_comp = ["ID_Loja"] if ignorar_braco else ["ID_Loja", "Braço"]
 
