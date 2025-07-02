@@ -158,6 +158,9 @@ def empacotar(df_base, volume_max, peso_max, ignorar_braco, converter_pac_para_u
 if arquivo_usado is not None:
     try:
         df_base = pd.read_excel(arquivo_usado, sheet_name="Base")
+    except Exception as e:
+        st.error("❌ Não foi possível ler a aba 'Base' do arquivo. Verifique se está usando o arquivo correto.")
+        st.stop()
 
         if st.button("🚀 Gerar Caixas (Comparar FFD x BFD)"):
             st.session_state.volume_maximo = volume_temp
