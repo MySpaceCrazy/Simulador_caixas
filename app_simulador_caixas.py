@@ -39,77 +39,88 @@ if arquivo is not None and arquivo != st.session_state.arquivo_atual:
 arquivo_usado = st.session_state.arquivo_atual
 
 # --- Função principal ---
-def agrupar_produtos(df_base, df_pos_fixa, volume_maximo, peso_maximo):
+def agrupar_produtos(df_base, volume_maximo, peso_maximo):
     resultado = []
-    caixas_geradas = 0
+    caixa_id_global = 1
 
-    df_base["Volume de carga"] = pd.to_numeric(df_base["Volume de carga"], errors="coerce")
-    df_base["Peso de carga"] = pd.to_numeric(df_base["Peso de carga"], errors="coerce")
+    df_base["Peso de carga"] = pd.to_numeric(df_base["Peso de carga"], errors="coerce").fillna(0)
+    df_base["Volume de carga"] = pd.to_numeric(df_base["Volume de carga"], errors="coerce").fillna(0)
+    df_base["Qtd.prev.orig.UMA"] = pd.to_numeric(df_base["Qtd.prev.orig.UMA"], errors="coerce").fillna(0)
 
-    for (loja, braco), grupo in df_base.merge(df_pos_fixa, on="ID_Produto").groupby(["ID_Loja", "Braço"]):
-        produtos = grupo.to_dict(orient="records")
+    df_base.loc[df_base["Unidade de peso"] == "G", "Peso de carga"] /= 1000
+
+    df_base["Braço"] = df_base["Layout"]  # usa a coluna já existente
+
+    grupos = df_base.groupby([
+        "ID_Loja", "Braço", "ID_Produto", "Descrição_produto",
+        "Volume de carga", "Peso de carga", "Unidade med.altern."
+    ], dropna=False)["Qtd.prev.orig.UMA"].sum().reset_index()
+
+    for (loja, braco), grupo in grupos.groupby(["ID_Loja", "Braço"]):
         caixas = []
-        caixa_atual = {"produtos": defaultdict(lambda: {
-            "Qtd_separada(UN)": 0,
-            "Volume_produto(L)": 0.0,
-            "Peso_produto(KG)": 0.0,
-            "Descrição_produto": ""
-        }), "volume": 0.0, "peso": 0.0}
 
-        for prod in produtos:
-            volume_prod = prod["Volume de carga"]
-            peso_prod = prod["Peso de carga"]
-            qtd_total = prod["Qtd.prev.orig.UMA"]
+        for _, prod in grupo.iterrows():
+            qtd_restante = int(prod["Qtd.prev.orig.UMA"])
+            volume_unit = prod["Volume de carga"]
+            peso_unit = prod["Peso de carga"]
             unidade_alt = prod["Unidade med.altern."]
+            id_prod = prod["ID_Produto"]
+            descricao = prod["Descrição_produto"]
 
-            if prod["Unidade de peso"] == "G":
-                peso_prod /= 1000
+            while qtd_restante > 0:
+                alocado = False
 
-            qtd_total = int(qtd_total) if not pd.isna(qtd_total) else 0
+                for cx in caixas:
+                    if unidade_alt == "PAC":
+                        if (cx["volume"] + volume_unit <= volume_maximo) and (cx["peso"] + peso_unit <= peso_maximo):
+                            cx["volume"] += volume_unit
+                            cx["peso"] += peso_unit
+                            cx["produtos"][id_prod]["Qtd"] += 1
+                            cx["produtos"][id_prod]["Volume"] += volume_unit
+                            cx["produtos"][id_prod]["Peso"] += peso_unit
+                            alocado = True
+                            qtd_restante -= 1
+                            break
+                    else:
+                        max_un_volume = int((volume_maximo - cx["volume"]) // volume_unit) if volume_unit > 0 else qtd_restante
+                        max_un_peso = int((peso_maximo - cx["peso"]) // peso_unit) if peso_unit > 0 else qtd_restante
+                        max_unidades = min(qtd_restante, max_un_volume, max_un_peso)
 
-            for _ in range(qtd_total):
-                precisa_nova_caixa = False
+                        if max_unidades > 0:
+                            cx["volume"] += volume_unit * max_unidades
+                            cx["peso"] += peso_unit * max_unidades
+                            cx["produtos"][id_prod]["Qtd"] += max_unidades
+                            cx["produtos"][id_prod]["Volume"] += volume_unit * max_unidades
+                            cx["produtos"][id_prod]["Peso"] += peso_unit * max_unidades
+                            qtd_restante -= max_unidades
+                            alocado = True
+                            break
 
-                if unidade_alt == "PAC":
-                    if (volume_prod > volume_maximo) or (peso_prod > peso_maximo):
-                        st.warning(f"O produto {prod['ID_Produto']} - {prod['Descrição_produto']} em PAC excede o limite de uma caixa. Verifique os parâmetros.")
-                    precisa_nova_caixa = (caixa_atual["volume"] + volume_prod > volume_maximo) or (caixa_atual["peso"] + peso_prod > peso_maximo)
-                else:
-                    precisa_nova_caixa = (caixa_atual["volume"] + volume_prod > volume_maximo) or (caixa_atual["peso"] + peso_prod > peso_maximo)
-
-                if precisa_nova_caixa:
-                    caixas.append(caixa_atual)
-                    caixa_atual = {"produtos": defaultdict(lambda: {
-                        "Qtd_separada(UN)": 0,
-                        "Volume_produto(L)": 0.0,
-                        "Peso_produto(KG)": 0.0,
-                        "Descrição_produto": ""
-                    }), "volume": 0.0, "peso": 0.0}
-
-                item = caixa_atual["produtos"][prod["ID_Produto"]]
-                item["Qtd_separada(UN)"] += 1
-                item["Volume_produto(L)"] += volume_prod
-                item["Peso_produto(KG)"] += peso_prod
-                item["Descrição_produto"] = prod["Descrição_produto"]
-
-                caixa_atual["volume"] += volume_prod
-                caixa_atual["peso"] += peso_prod
-
-        if caixa_atual["produtos"]:
-            caixas.append(caixa_atual)
+                if not alocado:
+                    nova_caixa = {
+                        "ID_Caixa": f"{loja}_{braco}_{caixa_id_global}",
+                        "ID_Loja": loja,
+                        "Braço": braco,
+                        "volume": 0.0,
+                        "peso": 0.0,
+                        "produtos": defaultdict(lambda: {
+                            "Qtd": 0, "Volume": 0.0, "Peso": 0.0, "Descricao": descricao
+                        })
+                    }
+                    caixas.append(nova_caixa)
+                    caixa_id_global += 1
 
         for cx in caixas:
-            caixas_geradas += 1
             for id_prod, dados in cx["produtos"].items():
                 resultado.append({
-                    "ID_Loja": loja,
-                    "Braço": braco,
-                    "ID_Caixa": f"{loja}_{braco}_{caixas_geradas}",
+                    "ID_Caixa": cx["ID_Caixa"],
+                    "ID_Loja": cx["ID_Loja"],
+                    "Braço": cx["Braço"],
                     "ID_Produto": id_prod,
-                    "Descrição_produto": dados["Descrição_produto"],
-                    "Qtd_separada(UN)": dados["Qtd_separada(UN)"],
-                    "Volume_produto(L)": dados["Volume_produto(L)"],
-                    "Peso_produto(KG)": dados["Peso_produto(KG)"],
+                    "Descrição_produto": dados["Descricao"],
+                    "Qtd_separada(UN)": dados["Qtd"],
+                    "Volume_produto(L)": dados["Volume"],
+                    "Peso_produto(KG)": dados["Peso"],
                     "Volume_caixa_total(L)": cx["volume"],
                     "Peso_caixa_total(KG)": cx["peso"]
                 })
@@ -120,14 +131,13 @@ def agrupar_produtos(df_base, df_pos_fixa, volume_maximo, peso_maximo):
 if arquivo_usado is not None:
     try:
         df_base = pd.read_excel(arquivo_usado, sheet_name="Base")
-        df_pos_fixa = pd.read_excel(arquivo_usado, sheet_name="Pos.Fixa")
+        df_pos_fixa = pd.read_excel(arquivo_usado, sheet_name="Pos.Fixa")  # compatível, mas não usado
 
         if st.button("🚀 Gerar Caixas"):
-            # Só atualiza os parâmetros fixos quando clica no botão
             st.session_state.volume_maximo = volume_temp
             st.session_state.peso_maximo = peso_temp
 
-            df_resultado = agrupar_produtos(df_base, df_pos_fixa, st.session_state.volume_maximo, st.session_state.peso_maximo)
+            df_resultado = agrupar_produtos(df_base, st.session_state.volume_maximo, st.session_state.peso_maximo)
             st.session_state.df_resultado = df_resultado
             st.success(f"Simulação concluída. Total de caixas geradas: {df_resultado['ID_Caixa'].nunique()}")
 
