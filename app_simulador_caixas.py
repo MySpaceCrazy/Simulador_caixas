@@ -1,5 +1,4 @@
-# Simulador de Geração de Caixas - Versão Corrigida (Volume/Peso Unitário)
-# Corrige cálculo por unidade baseado no total fornecido no Excel
+# Simulador de Geração de Caixas - Versão 2.2
 
 import streamlit as st
 import pandas as pd
