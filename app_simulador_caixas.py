@@ -1,4 +1,4 @@
-# Simulador de Geração de Caixas - Versão 2.2
+# Simulador de Geração de Caixas - Versão 2.3
 
 import streamlit as st
 import pandas as pd
@@ -39,34 +39,31 @@ with col4:
 with col5:
     converter_pac_para_un = st.checkbox("🔄 Converter PAC para UN para otimização", value=False)
 
-# Detecta troca de arquivo e reseta resultados
+# Detecta troca de arquivo
 if arquivo is not None and arquivo != st.session_state.arquivo_atual:
     st.session_state.arquivo_atual = arquivo
     st.session_state.df_resultado = None
 
 arquivo_usado = st.session_state.arquivo_atual
 
-# --- Função principal de empacotamento ---
+# --- Função de empacotamento ---
 def empacotar(df_base, volume_max, peso_max, ignorar_braco, converter_pac_para_un, metodo="FFD"):
     resultado = []
     caixa_id_global = 1
 
-    # Normaliza dados numéricos
     df_base["Peso de carga"] = pd.to_numeric(df_base["Peso de carga"], errors="coerce").fillna(0)
     df_base["Volume de carga"] = pd.to_numeric(df_base["Volume de carga"], errors="coerce").fillna(0)
     df_base["Qtd.prev.orig.UMA"] = pd.to_numeric(df_base["Qtd.prev.orig.UMA"], errors="coerce").fillna(1)
     df_base.loc[df_base["Unidade de peso"] == "G", "Peso de carga"] /= 1000
 
-    # Corrige: Calcula volume e peso unitário (o volume total foi informado, precisamos dividir pela quantidade)
+    # Corrige: calcula unitário
     df_base["Volume unitário"] = df_base["Volume de carga"] / df_base["Qtd.prev.orig.UMA"]
     df_base["Peso unitário"] = df_base["Peso de carga"] / df_base["Qtd.prev.orig.UMA"]
 
-    # Agrupadores
     agrupadores = ["ID_Loja"]
     if not ignorar_braco and "Braço" in df_base.columns:
         agrupadores.append("Braço")
 
-    # Agrupa produtos por loja e braço
     grupos = df_base.groupby(
         agrupadores + ["ID_Produto", "Descrição_produto", "Volume unitário", "Peso unitário", "Unidade med.altern."]
     )[["Qtd.prev.orig.UMA"]].sum().reset_index()
@@ -157,11 +154,11 @@ def empacotar(df_base, volume_max, peso_max, ignorar_braco, converter_pac_para_u
 # --- Execução Principal ---
 if arquivo_usado is not None:
     try:
-        df_base = pd.read_excel(arquivo_usado, sheet_name="Base")
-
         if st.button("🚀 Gerar Caixas (Comparar FFD x BFD)"):
             st.session_state.volume_maximo = volume_temp
             st.session_state.peso_maximo = peso_temp
+
+            df_base = pd.read_excel(arquivo_usado, sheet_name="Base")
 
             df_ffd = empacotar(df_base.copy(), st.session_state.volume_maximo, st.session_state.peso_maximo, ignorar_braco, converter_pac_para_un, metodo="FFD")
             df_bfd = empacotar(df_base.copy(), st.session_state.volume_maximo, st.session_state.peso_maximo, ignorar_braco, converter_pac_para_un, metodo="BFD")
@@ -179,33 +176,17 @@ if arquivo_usado is not None:
                 metodo_usado = "FFD"
 
             st.success(f"🏆 Melhor resultado: {metodo_usado} com {st.session_state.df_resultado['ID_Caixa'].nunique()} caixas.")
-            
-            # Relatório de Eficiência logo após o resultado
+
+            # Eficiência
             df_caixas = st.session_state.df_resultado.drop_duplicates(subset=["ID_Caixa", "Volume_caixa_total(L)", "Peso_caixa_total(KG)"])
             media_volume = (df_caixas["Volume_caixa_total(L)"].mean() / st.session_state.volume_maximo) * 100
             media_peso = (df_caixas["Peso_caixa_total(KG)"].mean() / st.session_state.peso_maximo) * 100
-            
+
             st.info(f"📈 Eficiência média das caixas:\n"
                     f"• Volume utilizado: {media_volume:.1f}%\n"
                     f"• Peso utilizado: {media_peso:.1f}%")
-            
-            # Comparação com Sistema Antigo (se existir ID_Caixa)
-            if "ID_Caixa" in df_base.columns:
-                col_comp = ["ID_Loja"] if ignorar_braco else ["ID_Loja", "Braço"]
-            
-                comparativo_sistema = df_base.drop_duplicates(subset=col_comp + ["ID_Caixa"])
-                comparativo_sistema = comparativo_sistema.groupby(col_comp).agg(Caixas_Sistema=("ID_Caixa", "nunique")).reset_index()
-            
-                gerado = st.session_state.df_resultado.drop_duplicates(subset=col_comp + ["ID_Caixa"])
-                comparativo_gerado = gerado.groupby(col_comp).agg(Caixas_App=("ID_Caixa", "nunique")).reset_index()
-            
-                comparativo = pd.merge(comparativo_sistema, comparativo_gerado, on=col_comp, how="outer").fillna(0)
-                comparativo["Diferença"] = comparativo["Caixas_App"] - comparativo["Caixas_Sistema"]
-            
-                st.subheader("📊 Comparativo de Caixas por Loja e Braço")
-                st.dataframe(comparativo)
 
-            # Comparação com Sistema Antigo (se existir ID_Caixa)
+            # Comparativo com sistema (se houver coluna ID_Caixa)
             if "ID_Caixa" in df_base.columns:
                 col_comp = ["ID_Loja"] if ignorar_braco else ["ID_Loja", "Braço"]
 
