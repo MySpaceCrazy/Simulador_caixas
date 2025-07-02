@@ -266,4 +266,4 @@ if arquivo_usado is not None:
             )
 
     except Exception as e:
-        st.error(f"❌ Erro no processamento: {e}")
+        st.error(f"Erro: {type(e).__name__} - {e}")
