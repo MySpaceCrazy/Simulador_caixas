@@ -20,7 +20,7 @@ if "df_resultado" not in st.session_state:
 if "arquivo_atual" not in st.session_state:
     st.session_state.arquivo_atual = None
 if "volume_maximo" not in st.session_state:
-    st.session_state.volume_maximo = 50.0
+    st.session_state.volume_maximo = 37.0
 if "peso_maximo" not in st.session_state:
     st.session_state.peso_maximo = 20.0
 
