@@ -1,4 +1,4 @@
-#Script - Simulador Caixas - versão 1.5
+Script - Simulador Caixas - versão 1.6
 
 import streamlit as st
 import pandas as pd
@@ -23,9 +23,8 @@ if "volume_maximo" not in st.session_state:
 if "peso_maximo" not in st.session_state:
     st.session_state.peso_maximo = 20.0
 
-# --- Parâmetros Temporários ---
+# --- Parâmetros ---
 col1, col2, col3 = st.columns(3)
-
 with col1:
     volume_temp = st.number_input("🔲 Volume máximo por caixa (Litros)", value=st.session_state.volume_maximo, step=0.1, key="volume_temp")
 with col2:
@@ -33,7 +32,6 @@ with col2:
 with col3:
     arquivo = st.file_uploader("📂 Selecionar arquivo de simulação (.xlsx)", type=["xlsx"])
 
-# Opções de Flexibilidade
 col4, col5 = st.columns(2)
 with col4:
     ignorar_braco = st.checkbox("🔃 Ignorar braço ao agrupar caixas", value=False)
@@ -46,8 +44,8 @@ if arquivo is not None and arquivo != st.session_state.arquivo_atual:
 
 arquivo_usado = st.session_state.arquivo_atual
 
-# --- Função principal ---
-def agrupar_produtos(df_base, volume_maximo, peso_maximo, ignorar_braco, converter_pac_para_un):
+# --- Função de empacotamento com heurística ---
+def empacotar_produtos(df_base, volume_maximo, peso_maximo, ignorar_braco, converter_pac_para_un, metodo="FFD"):
     resultado = []
     caixa_id_global = 1
 
@@ -65,6 +63,7 @@ def agrupar_produtos(df_base, volume_maximo, peso_maximo, ignorar_braco, convert
         agrupadores + ["ID_Produto", "Descrição_produto", "Volume de carga", "Peso de carga", "Unidade med.altern."]
     )[["Qtd.prev.orig.UMA"]].sum().reset_index()
 
+    # Ordena os produtos (decrescente) conforme heurística
     grupos = grupos.sort_values(by=["Volume de carga", "Peso de carga"], ascending=False)
 
     for keys, grupo in grupos.groupby(agrupadores):
@@ -88,9 +87,10 @@ def agrupar_produtos(df_base, volume_maximo, peso_maximo, ignorar_braco, convert
                 unidade_alt = "UN"
 
             while qtd_restante > 0:
-                alocado = False
+                melhor_caixa_idx = -1
+                melhor_espaco = None
 
-                for cx in caixas:
+                for idx, cx in enumerate(caixas):
                     max_un_volume = int((volume_maximo - cx["volume"]) // volume_unit) if volume_unit > 0 else qtd_restante
                     max_un_peso = int((peso_maximo - cx["peso"]) // peso_unit) if peso_unit > 0 else qtd_restante
                     max_unidades = min(qtd_restante, max_un_volume, max_un_peso)
@@ -101,16 +101,33 @@ def agrupar_produtos(df_base, volume_maximo, peso_maximo, ignorar_braco, convert
                         continue
 
                     if max_unidades > 0:
-                        cx["volume"] += volume_unit * max_unidades
-                        cx["peso"] += peso_unit * max_unidades
-                        cx["produtos"][id_prod]["Qtd"] += max_unidades
-                        cx["produtos"][id_prod]["Volume"] += volume_unit * max_unidades
-                        cx["produtos"][id_prod]["Peso"] += peso_unit * max_unidades
-                        qtd_restante -= max_unidades
-                        alocado = True
-                        break
+                        espaco_restante = (volume_maximo - (cx["volume"] + volume_unit * max_unidades)) + \
+                                          (peso_maximo - (cx["peso"] + peso_unit * max_unidades))
 
-                if not alocado:
+                        if metodo == "FFD":
+                            melhor_caixa_idx = idx
+                            break  # FFD: coloca na primeira que couber
+                        elif metodo == "BFD":
+                            if melhor_espaco is None or espaco_restante < melhor_espaco:
+                                melhor_espaco = espaco_restante
+                                melhor_caixa_idx = idx
+
+                if melhor_caixa_idx != -1:
+                    cx = caixas[melhor_caixa_idx]
+                    max_un_volume = int((volume_maximo - cx["volume"]) // volume_unit) if volume_unit > 0 else qtd_restante
+                    max_un_peso = int((peso_maximo - cx["peso"]) // peso_unit) if peso_unit > 0 else qtd_restante
+                    max_unidades = min(qtd_restante, max_un_volume, max_un_peso)
+
+                    if unidade_alt == "PAC":
+                        max_unidades = 1
+
+                    cx["volume"] += volume_unit * max_unidades
+                    cx["peso"] += peso_unit * max_unidades
+                    cx["produtos"][id_prod]["Qtd"] += max_unidades
+                    cx["produtos"][id_prod]["Volume"] += volume_unit * max_unidades
+                    cx["produtos"][id_prod]["Peso"] += peso_unit * max_unidades
+                    qtd_restante -= max_unidades
+                else:
                     nova_caixa = {
                         "ID_Caixa": f"{loja}_{braco}_{caixa_id_global}",
                         "ID_Loja": loja,
@@ -145,15 +162,27 @@ def agrupar_produtos(df_base, volume_maximo, peso_maximo, ignorar_braco, convert
 if arquivo_usado is not None:
     try:
         df_base = pd.read_excel(arquivo_usado, sheet_name="Base")
-        df_pos_fixa = pd.read_excel(arquivo_usado, sheet_name="Pos.Fixa")
 
-        if st.button("🚀 Gerar Caixas"):
+        if st.button("🚀 Gerar Caixas (FFD x BFD)"):
             st.session_state.volume_maximo = volume_temp
             st.session_state.peso_maximo = peso_temp
 
-            df_resultado = agrupar_produtos(df_base.copy(), st.session_state.volume_maximo, st.session_state.peso_maximo, ignorar_braco, converter_pac_para_un)
-            st.session_state.df_resultado = df_resultado
-            st.success(f"Simulação concluída. Total de caixas geradas: {df_resultado['ID_Caixa'].nunique()}")
+            df_ffd = empacotar_produtos(df_base.copy(), st.session_state.volume_maximo, st.session_state.peso_maximo, ignorar_braco, converter_pac_para_un, metodo="FFD")
+            df_bfd = empacotar_produtos(df_base.copy(), st.session_state.volume_maximo, st.session_state.peso_maximo, ignorar_braco, converter_pac_para_un, metodo="BFD")
+
+            total_ffd = df_ffd["ID_Caixa"].nunique()
+            total_bfd = df_bfd["ID_Caixa"].nunique()
+
+            st.info(f"📦 FFD gerou: {total_ffd} caixas | BFD gerou: {total_bfd} caixas")
+
+            if total_bfd < total_ffd:
+                st.session_state.df_resultado = df_bfd
+                metodo_usado = "BFD"
+            else:
+                st.session_state.df_resultado = df_ffd
+                metodo_usado = "FFD"
+
+            st.success(f"Melhor resultado: {metodo_usado} com {st.session_state.df_resultado['ID_Caixa'].nunique()} caixas.")
 
             # --- Comparativo com sistema original ---
             if "ID_Caixa" in df_base.columns:
