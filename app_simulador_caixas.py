@@ -179,6 +179,31 @@ if arquivo_usado is not None:
                 metodo_usado = "FFD"
 
             st.success(f"🏆 Melhor resultado: {metodo_usado} com {st.session_state.df_resultado['ID_Caixa'].nunique()} caixas.")
+            
+            # Relatório de Eficiência logo após o resultado
+            df_caixas = st.session_state.df_resultado.drop_duplicates(subset=["ID_Caixa", "Volume_caixa_total(L)", "Peso_caixa_total(KG)"])
+            media_volume = (df_caixas["Volume_caixa_total(L)"].mean() / st.session_state.volume_maximo) * 100
+            media_peso = (df_caixas["Peso_caixa_total(KG)"].mean() / st.session_state.peso_maximo) * 100
+            
+            st.info(f"📈 Eficiência média das caixas:\n"
+                    f"• Volume utilizado: {media_volume:.1f}%\n"
+                    f"• Peso utilizado: {media_peso:.1f}%")
+            
+            # Comparação com Sistema Antigo (se existir ID_Caixa)
+            if "ID_Caixa" in df_base.columns:
+                col_comp = ["ID_Loja"] if ignorar_braco else ["ID_Loja", "Braço"]
+            
+                comparativo_sistema = df_base.drop_duplicates(subset=col_comp + ["ID_Caixa"])
+                comparativo_sistema = comparativo_sistema.groupby(col_comp).agg(Caixas_Sistema=("ID_Caixa", "nunique")).reset_index()
+            
+                gerado = st.session_state.df_resultado.drop_duplicates(subset=col_comp + ["ID_Caixa"])
+                comparativo_gerado = gerado.groupby(col_comp).agg(Caixas_App=("ID_Caixa", "nunique")).reset_index()
+            
+                comparativo = pd.merge(comparativo_sistema, comparativo_gerado, on=col_comp, how="outer").fillna(0)
+                comparativo["Diferença"] = comparativo["Caixas_App"] - comparativo["Caixas_Sistema"]
+            
+                st.subheader("📊 Comparativo de Caixas por Loja e Braço")
+                st.dataframe(comparativo)
 
             # Comparação com Sistema Antigo (se existir ID_Caixa)
             if "ID_Caixa" in df_base.columns:
@@ -198,15 +223,6 @@ if arquivo_usado is not None:
 
         if st.session_state.df_resultado is not None:
             st.dataframe(st.session_state.df_resultado)
-
-            # Relatório de Eficiência
-            df_caixas = st.session_state.df_resultado.drop_duplicates(subset=["ID_Caixa", "Volume_caixa_total(L)", "Peso_caixa_total(KG)"])
-            media_volume = (df_caixas["Volume_caixa_total(L)"].mean() / st.session_state.volume_maximo) * 100
-            media_peso = (df_caixas["Peso_caixa_total(KG)"].mean() / st.session_state.peso_maximo) * 100
-
-            st.info(f"📈 Eficiência média das caixas:\n"
-                    f"• Volume utilizado: {media_volume:.1f}%\n"
-                    f"• Peso utilizado: {media_peso:.1f}%")
 
             buffer = io.BytesIO()
             with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
