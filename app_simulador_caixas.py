@@ -49,12 +49,14 @@ def agrupar_produtos(df_base, volume_maximo, peso_maximo):
 
     df_base.loc[df_base["Unidade de peso"] == "G", "Peso de carga"] /= 1000
 
-    df_base["Braço"] = df_base["Layout"]  # usa a coluna já existente
+    df_base["Braço"] = df_base["Layout"] if "Layout" in df_base.columns else df_base["Braço"]
 
     grupos = df_base.groupby([
         "ID_Loja", "Braço", "ID_Produto", "Descrição_produto",
         "Volume de carga", "Peso de carga", "Unidade med.altern."
     ], dropna=False)["Qtd.prev.orig.UMA"].sum().reset_index()
+
+    grupos = grupos.sort_values(by=["Volume de carga", "Peso de carga"], ascending=False)
 
     for (loja, braco), grupo in grupos.groupby(["ID_Loja", "Braço"]):
         caixas = []
@@ -131,15 +133,27 @@ def agrupar_produtos(df_base, volume_maximo, peso_maximo):
 if arquivo_usado is not None:
     try:
         df_base = pd.read_excel(arquivo_usado, sheet_name="Base")
-        df_pos_fixa = pd.read_excel(arquivo_usado, sheet_name="Pos.Fixa")  # compatível, mas não usado
+        df_pos_fixa = pd.read_excel(arquivo_usado, sheet_name="Pos.Fixa")  # compatível, mas não utilizado diretamente
 
         if st.button("🚀 Gerar Caixas"):
             st.session_state.volume_maximo = volume_temp
             st.session_state.peso_maximo = peso_temp
 
-            df_resultado = agrupar_produtos(df_base, st.session_state.volume_maximo, st.session_state.peso_maximo)
+            df_resultado = agrupar_produtos(df_base.copy(), st.session_state.volume_maximo, st.session_state.peso_maximo)
             st.session_state.df_resultado = df_resultado
             st.success(f"Simulação concluída. Total de caixas geradas: {df_resultado['ID_Caixa'].nunique()}")
+
+            # --- Comparativo com sistema original ---
+            if "ID_Caixa" in df_base.columns:
+                original = df_base.dropna(subset=["ID_Caixa"])
+                comparativo_sistema = original.groupby(["ID_Loja", "Braço"])["ID_Caixa"].nunique().reset_index(name="Caixas_Sistema")
+
+                gerado = df_resultado.groupby(["ID_Loja", "Braço"])["ID_Caixa"].nunique().reset_index(name="Caixas_App")
+
+                comparativo = pd.merge(comparativo_sistema, gerado, on=["ID_Loja", "Braço"], how="outer").fillna(0)
+                comparativo["Diferença"] = comparativo["Caixas_App"] - comparativo["Caixas_Sistema"]
+                st.subheader("📊 Comparativo de Caixas por Loja e Braço")
+                st.dataframe(comparativo)
 
         if st.session_state.df_resultado is not None:
             st.dataframe(st.session_state.df_resultado)
