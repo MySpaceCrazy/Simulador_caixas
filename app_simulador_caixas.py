@@ -210,7 +210,7 @@ if arquivo_usado is not None:
                 st.dataframe(comparativo)
 
         if st.session_state.df_resultado is not None:
-            st.subheader("📊 Caixas por Loja e Braço")
+            st.subheader(""https://raw.githubusercontent.com/MySpaceCrazy/Simulador_caixas/refs/heads/main/caixa-aberta.ico" Detalhe caixas")
             st.dataframe(st.session_state.df_resultado)
 
             buffer = io.BytesIO()
