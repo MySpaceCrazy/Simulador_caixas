@@ -44,7 +44,27 @@ arquivo_usado = st.session_state.arquivo_atual
 def empacotar(df_base, volume_max, peso_max, ignorar_braco, converter_pac_para_un, metodo="FFD"):
     resultado = []
     caixa_id_global = 1
+    
+    # --- Ajuste PAC para UN se a flag estiver marcada ---
+    if converter_pac_para_un:
+        df_base = df_base.copy()  # Evita alterar o dataframe original
+        pac_rows = df_base["Unidade med.altern."] == "PAC"
 
+        # Substitui a quantidade por unidades individuais
+        df_base.loc[pac_rows, "Qtd.prev.orig.UMA"] = df_base.loc[pac_rows, "Qtd solicitada (UN)"]
+
+        # Recalcula peso e volume proporcional por unidade (usando o valor total dividido pela quantidade solicitada em UN)
+        df_base.loc[pac_rows, "Peso de carga"] = (
+            df_base.loc[pac_rows, "Peso de carga"] / df_base.loc[pac_rows, "Qtd.prev.orig.UMA"]
+        ) * df_base.loc[pac_rows, "Qtd.prev.orig.UMA"]
+
+        df_base.loc[pac_rows, "Volume de carga"] = (
+            df_base.loc[pac_rows, "Volume de carga"] / df_base.loc[pac_rows, "Qtd.prev.orig.UMA"]
+        ) * df_base.loc[pac_rows, "Qtd.prev.orig.UMA"]
+
+        # Altera a unidade para UN
+        df_base.loc[pac_rows, "Unidade med.altern."] = "UN"
+        
     # Normaliza dados numéricos
     df_base["Peso de carga"] = pd.to_numeric(df_base["Peso de carga"], errors="coerce").fillna(0)
     df_base["Volume de carga"] = pd.to_numeric(df_base["Volume de carga"], errors="coerce").fillna(0)
