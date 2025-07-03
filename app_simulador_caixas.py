@@ -1,4 +1,4 @@
-# Simulador de Geração de Caixas - Versão Final Corrigida 2D + 3D Agrupado
+# Simulador de Geração de Caixas - Versão Consolidada 2D + 3D Correta
 
 import streamlit as st
 import pandas as pd
@@ -125,10 +125,11 @@ def empacotar(df_base, volume_max, peso_max, ignorar_braco, converter_pac_para_u
 
     return pd.DataFrame(resultado)
 
-# --- Função Empacotar 3D Corrigida ---
+# --- Função Empacotar 3D Corrigida (Agrupamento correto + ID_Caixa no padrão do 2D) ---
 def empacotar_3d(df_base, df_mestre, comprimento_caixa, largura_caixa, altura_caixa, peso_max, ocupacao_percentual):
     volume_caixa_litros = (comprimento_caixa * largura_caixa * altura_caixa * (ocupacao_percentual / 100)) / 1000
     resultado = []
+    
     df_join = pd.merge(df_base, df_mestre, how='left', left_on=['ID_Produto', 'Unidade med.altern.'], right_on=['Produto', 'UM alternativa'])
     df_join = df_join.dropna(subset=['Comprimento', 'Largura', 'Altura'])
 
@@ -186,8 +187,8 @@ def empacotar_3d(df_base, df_mestre, comprimento_caixa, largura_caixa, altura_ca
                 })
 
     return pd.DataFrame(resultado)
+# --- Execução principal do Simulador ---
 
-# --- Execução ---
 if arquivo:
     try:
         df_base = pd.read_excel(arquivo, sheet_name="Base")
@@ -197,40 +198,57 @@ if arquivo:
             st.session_state.volume_maximo = volume_temp
             st.session_state.peso_maximo = peso_temp
 
+            # Geração 2D com FFD e BFD
             df_ffd = empacotar(df_base.copy(), volume_temp, peso_temp, ignorar_braco, converter_pac_para_un, metodo="FFD")
             df_bfd = empacotar(df_base.copy(), volume_temp, peso_temp, ignorar_braco, converter_pac_para_un, metodo="BFD")
+
             metodo_usado = "BFD" if df_bfd["ID_Caixa"].nunique() < df_ffd["ID_Caixa"].nunique() else "FFD"
             st.session_state.df_resultado_2d = df_bfd if metodo_usado == "BFD" else df_ffd
 
             st.info(f"📦 FFD gerou: {df_ffd['ID_Caixa'].nunique()} caixas | BFD gerou: {df_bfd['ID_Caixa'].nunique()} caixas")
             st.success(f"🏆 Melhor resultado: {metodo_usado} com {st.session_state.df_resultado_2d['ID_Caixa'].nunique()} caixas.")
 
-            df_caixas = st.session_state.df_resultado_2d.drop_duplicates(subset=["ID_Caixa", "Volume_caixa_total(L)", "Peso_caixa_total(KG)"])
-            media_volume = (df_caixas["Volume_caixa_total(L)"].mean() / volume_temp) * 100
-            media_peso = (df_caixas["Peso_caixa_total(KG)"].mean() / peso_temp) * 100
-            st.info(f"📈 Eficiência média das caixas:\n• Volume: {media_volume:.1f}%\n• Peso: {media_peso:.1f}%")
-
-            st.subheader("📊 Comparativo de Caixas por Loja e Braço (2D)")
-            comparativo_2d = st.session_state.df_resultado_2d.groupby(["ID_Loja", "Braço"]).agg(Caixas_App=("ID_Caixa", "nunique")).reset_index()
-            st.dataframe(comparativo_2d)
-
-            st.markdown('<h3><img src="https://raw.githubusercontent.com/MySpaceCrazy/Simulador_caixas/refs/heads/main/caixa-aberta.ico" width="24"> Detalhe caixas 2D</h3>', unsafe_allow_html=True)
             st.dataframe(st.session_state.df_resultado_2d)
 
-            st.session_state.df_resultado_3d = empacotar_3d(df_base.copy(), df_mestre.copy(), comprimento_caixa, largura_caixa, altura_caixa, peso_temp, ocupacao_maxima)
+            # Geração 3D
+            st.session_state.df_resultado_3d = empacotar_3d(
+                df_base.copy(), df_mestre.copy(), comprimento_caixa, largura_caixa,
+                altura_caixa, peso_temp, ocupacao_maxima
+            )
             st.info(f"📦 Total de caixas geradas (3D): {st.session_state.df_resultado_3d['ID_Caixa'].nunique()}")
 
-            df_caixas_3d = st.session_state.df_resultado_3d.drop_duplicates(subset=["ID_Caixa", "Volume_caixa_total(L)", "Peso_caixa_total(KG)"])
-            media_volume_3d = (df_caixas_3d["Volume_caixa_total(L)"].mean() / ((comprimento_caixa * largura_caixa * altura_caixa)/1000)) * 100
-            media_peso_3d = (df_caixas_3d["Peso_caixa_total(KG)"].mean() / peso_temp) * 100
-            st.info(f"📈 Eficiência média das caixas 3D:\n• Volume: {media_volume_3d:.1f}%\n• Peso: {media_peso_3d:.1f}%")
-
-            st.subheader("📊 Comparativo de Caixas por Loja e Braço (3D)")
-            comparativo_3d = st.session_state.df_resultado_3d.groupby(["ID_Loja", "Braço"]).agg(Caixas_App=("ID_Caixa", "nunique")).reset_index()
-            st.dataframe(comparativo_3d)
-
-            st.markdown('<h3><img src="https://raw.githubusercontent.com/MySpaceCrazy/Simulador_caixas/refs/heads/main/caixa-aberta.ico" width="24"> Detalhe caixas 3D</h3>', unsafe_allow_html=True)
             st.dataframe(st.session_state.df_resultado_3d)
 
     except Exception as e:
         st.error(f"Erro no processamento: {e}")
+
+# --- Download dos resultados ---
+
+st.markdown("---")
+st.subheader("💾 Baixar Relatórios")
+
+col_d1, col_d2 = st.columns(2)
+
+with col_d1:
+    if st.session_state.df_resultado_2d is not None:
+        buffer_2d = io.BytesIO()
+        with pd.ExcelWriter(buffer_2d, engine="xlsxwriter") as writer:
+            st.session_state.df_resultado_2d.to_excel(writer, index=False, sheet_name="Resultado 2D")
+        st.download_button(
+            label="⬇️ Baixar Relatório 2D",
+            data=buffer_2d.getvalue(),
+            file_name="Relatorio_Caixas_2D.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+
+with col_d2:
+    if st.session_state.df_resultado_3d is not None:
+        buffer_3d = io.BytesIO()
+        with pd.ExcelWriter(buffer_3d, engine="xlsxwriter") as writer:
+            st.session_state.df_resultado_3d.to_excel(writer, index=False, sheet_name="Resultado 3D")
+        st.download_button(
+            label="⬇️ Baixar Relatório 3D",
+            data=buffer_3d.getvalue(),
+            file_name="Relatorio_Caixas_3D.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
