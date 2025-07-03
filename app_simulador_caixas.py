@@ -4,12 +4,16 @@ import pandas as pd
 import io
 from collections import defaultdict
 
+# --- Configuração inicial ---
+st.set_page_config(page_title="Simulador de Caixas - 2D", page_icon="📦", layout="wide")
+st.title("📦 Simulador de Caixas por Loja e Braço - 2D")
+
 # --- Configuração inicial do Streamlit ---
-st.set_page_config(
-    page_title="Simulador de Geração de Caixas por Loja e Braço - 2D",
-    page_icon="📦",
-    layout="wide"
-)
+#st.set_page_config(
+#    page_title="Simulador de Geração de Caixas por Loja e Braço - 2D",
+#    page_icon="📦",
+#    layout="wide"
+#)
 
 st.title("📦 Simulador de Caixas por Loja e Braço - 2D")
 
