@@ -6,7 +6,7 @@ from collections import defaultdict
 
 # --- Configuração inicial do Streamlit ---
 st.set_page_config(
-    page_title="Simulador de Geração de Caixas por Loja e Braço",
+    page_title="Simulador de Geração de Caixas por Loja e Braço - 2D",
     page_icon="📦",
     layout="wide"
 )
