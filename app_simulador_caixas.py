@@ -11,7 +11,7 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("📦 Simulador de Caixas por Loja e Braço")
+st.title("📦 Simulador de Caixas por Loja e Braço - 2D")
 
 # --- Controle de estados da aplicação ---
 if "df_resultado" not in st.session_state:
