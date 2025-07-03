@@ -214,7 +214,6 @@ if arquivo_usado is not None:
                 f'<h3><img src="https://raw.githubusercontent.com/MySpaceCrazy/Simulador_caixas/refs/heads/main/caixa-aberta.ico" width="24" style="vertical-align:middle;"> Detalhe caixas</h3>',
                 unsafe_allow_html=True
             )
-            #st.subheader(page_title="Detalhe caixas", page_icon="https://raw.githubusercontent.com/MySpaceCrazy/Simulador_caixas/refs/heads/main/caixa-aberta.ico")
             st.dataframe(st.session_state.df_resultado)
 
             buffer = io.BytesIO()
