@@ -235,8 +235,28 @@ if arquivo:
             media_peso_3d = (df_caixas_3d["Peso_caixa_total(KG)"].mean() / peso_temp) * 100
             st.info(f"📈 Eficiência média das caixas 3D:\n• Volume: {media_volume_3d:.1f}%\n• Peso: {media_peso_3d:.1f}%")
 
+            # --- Comparativo de Caixas por Loja e Braço (3D) ---
+            
+            # Pega o Braço da Base
+            df_base_aux = df_base[["ID_Loja", "Braço", "ID_Caixa"]].drop_duplicates()
+            
+            # Caixas geradas no 3D
+            df_3d = st.session_state.df_resultado_3d.copy()
+            
+            # Simula sistema original usando a Base
+            comparativo_sistema_3d = df_base_aux.groupby(["ID_Loja", "Braço"]).agg(Caixas_Sistema=("ID_Caixa", "nunique")).reset_index()
+            
+            # Gera comparativo do que o app montou no 3D
+            caixas_3d = df_3d.drop_duplicates(subset=["ID_Caixa", "ID_Loja", "Braço"])
+            comparativo_gerado_3d = caixas_3d.groupby(["ID_Loja", "Braço"]).agg(Caixas_App=("ID_Caixa", "nunique")).reset_index()
+            
+            # Junta os dois comparativos
+            comparativo_3d = pd.merge(comparativo_sistema_3d, comparativo_gerado_3d, on=["ID_Loja", "Braço"], how="outer").fillna(0)
+            comparativo_3d["Diferença"] = comparativo_3d["Caixas_App"] - comparativo_3d["Caixas_Sistema"]
+            
+            # Mostra resultado na tela
             st.subheader("📊 Comparativo de Caixas por Loja e Braço (3D)")
-            st.dataframe(st.session_state.df_resultado_3d)
+            st.dataframe(comparativo_3d)
 
             st.markdown('<h3><img src="https://raw.githubusercontent.com/MySpaceCrazy/Simulador_caixas/refs/heads/main/caixa-aberta.ico" width="24" style="vertical-align:middle;"> Detalhe caixas 3D</h3>', unsafe_allow_html=True)
             st.dataframe(st.session_state.df_resultado_3d)
