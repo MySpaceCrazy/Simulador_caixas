@@ -8,15 +8,6 @@ from collections import defaultdict
 st.set_page_config(page_title="Simulador de Caixas - 2D", page_icon="📦", layout="wide")
 st.title("📦 Simulador de Caixas por Loja e Braço - 2D")
 
-# --- Configuração inicial do Streamlit ---
-#st.set_page_config(
-#    page_title="Simulador de Geração de Caixas por Loja e Braço - 2D",
-#    page_icon="📦",
-#    layout="wide"
-#)
-
-st.title("📦 Simulador de Caixas por Loja e Braço - 2D")
-
 # --- Controle de estados da aplicação ---
 if "df_resultado" not in st.session_state:
     st.session_state.df_resultado = None
