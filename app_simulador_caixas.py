@@ -210,6 +210,7 @@ if arquivo_usado is not None:
                 st.dataframe(comparativo)
 
         if st.session_state.df_resultado is not None:
+            st.subheader("📊 Caixas por Loja e Braço")
             st.dataframe(st.session_state.df_resultado)
 
             buffer = io.BytesIO()
