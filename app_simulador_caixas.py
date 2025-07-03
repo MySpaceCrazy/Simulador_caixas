@@ -54,7 +54,7 @@ def empacotar(df_base, volume_max, peso_max, ignorar_braco, converter_pac_para_u
     df_base["Peso de carga"] = pd.to_numeric(df_base["Peso de carga"], errors="coerce").fillna(0)
     df_base["Volume de carga"] = pd.to_numeric(df_base["Volume de carga"], errors="coerce").fillna(0)
     df_base["Qtd.prev.orig.UMA"] = pd.to_numeric(df_base["Qtd.prev.orig.UMA"], errors="coerce").fillna(1)
-    df_base.loc[df_base["Unidade de peso"] == "G", "Peso de carga"] /= 1000
+    df_base.loc[df_base["Unidade de peso KG"] == "G", "Peso de carga"] /= 1000
 
     # Corrige: Calcula volume e peso unitário
     df_base["Volume unitário"] = df_base["Volume de carga"] / df_base["Qtd.prev.orig.UMA"]
