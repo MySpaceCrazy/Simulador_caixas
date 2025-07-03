@@ -1,15 +1,15 @@
-# Simulador de Geração de Caixas - Versão 3.2 (Corrigido)
+# Simulador de Geração de Caixas - Versão 3.3
 
 import streamlit as st
 import pandas as pd
 import io
 from collections import defaultdict
 
-# --- Configuração Streamlit ---
+# --- Configuração do Streamlit ---
 st.set_page_config(page_title="Simulador de Caixas", page_icon="📦", layout="wide")
 st.title("📦 Simulador de Caixas por Loja e Braço")
 
-# --- Controle de estado ---
+# --- Controle de estados ---
 if "df_resultado" not in st.session_state:
     st.session_state.df_resultado = None
 if "df_resultado_3d" not in st.session_state:
@@ -21,14 +21,14 @@ if "volume_maximo" not in st.session_state:
 if "peso_maximo" not in st.session_state:
     st.session_state.peso_maximo = 20.0
 
-# --- Parâmetros 2D ---
+# --- Interface de Parâmetros 2D ---
 col1, col2, col3 = st.columns(3)
 with col1:
     volume_temp = st.number_input("🔲 Volume máximo por caixa (Litros)", value=st.session_state.volume_maximo, step=0.1)
 with col2:
     peso_temp = st.number_input("⚖️ Peso máximo por caixa (KG)", value=st.session_state.peso_maximo, step=0.1)
 with col3:
-    arquivo = st.file_uploader("📂 Selecionar arquivo (.xlsx)", type=["xlsx"])
+    arquivo = st.file_uploader("📂 Selecionar arquivo de simulação (.xlsx)", type=["xlsx"])
 
 col4, col5 = st.columns(2)
 with col4:
@@ -36,7 +36,7 @@ with col4:
 with col5:
     converter_pac_para_un = st.checkbox("🔄 Converter PAC para UN para otimização", value=False)
 
-# --- Parâmetros 3D ---
+# --- Interface de Parâmetros 3D ---
 st.markdown("---")
 st.subheader("📦 Parâmetros do Empacotamento 3D")
 col6, col7, col8, col9 = st.columns(4)
@@ -49,21 +49,24 @@ with col8:
 with col9:
     ocupacao_maxima = st.number_input("🔲 % de ocupação máxima (3D)", value=100.0, step=1.0, min_value=1.0, max_value=100.0)
 
-# --- Troca de arquivo ---
+# --- Detecta troca de arquivo e reseta resultados ---
 if arquivo is not None and arquivo != st.session_state.arquivo_atual:
     st.session_state.arquivo_atual = arquivo
     st.session_state.df_resultado = None
     st.session_state.df_resultado_3d = None
 
-# --- Função Empacotar 2D ---
+# --- Função principal de empacotamento 2D ---
 def empacotar(df_base, volume_max, peso_max, ignorar_braco, converter_pac_para_un, metodo="FFD"):
     resultado = []
     caixa_id_global = 1
 
+    # Normaliza dados numéricos
     df_base["Peso de carga"] = pd.to_numeric(df_base["Peso de carga"], errors="coerce").fillna(0)
     df_base["Volume de carga"] = pd.to_numeric(df_base["Volume de carga"], errors="coerce").fillna(0)
     df_base["Qtd.prev.orig.UMA"] = pd.to_numeric(df_base["Qtd.prev.orig.UMA"], errors="coerce").fillna(1)
     df_base.loc[df_base["Unidade de peso"] == "G", "Peso de carga"] /= 1000
+
+    # Calcula volume e peso unitário
     df_base["Volume unitário"] = df_base["Volume de carga"] / df_base["Qtd.prev.orig.UMA"]
     df_base["Peso unitário"] = df_base["Peso de carga"] / df_base["Qtd.prev.orig.UMA"]
 
@@ -83,6 +86,11 @@ def empacotar(df_base, volume_max, peso_max, ignorar_braco, converter_pac_para_u
             qtd_restante = int(prod["Qtd.prev.orig.UMA"])
             volume_unit = prod["Volume unitário"]
             peso_unit = prod["Peso unitário"]
+            unidade_alt = prod["Unidade med.altern."]
+            descricao = prod["Descrição_produto"]
+
+            if converter_pac_para_un and unidade_alt == "PAC":
+                unidade_alt = "UN"
 
             while qtd_restante > 0:
                 melhor_caixa_idx = -1
@@ -101,6 +109,7 @@ def empacotar(df_base, volume_max, peso_max, ignorar_braco, converter_pac_para_u
                     max_un_volume = int((volume_max - cx["volume"]) // volume_unit) if volume_unit > 0 else qtd_restante
                     max_un_peso = int((peso_max - cx["peso"]) // peso_unit) if peso_unit > 0 else qtd_restante
                     max_unidades = min(qtd_restante, max_un_volume, max_un_peso)
+
                     cx["volume"] += volume_unit * max_unidades
                     cx["peso"] += peso_unit * max_unidades
                     qtd_restante -= max_unidades
@@ -111,7 +120,7 @@ def empacotar(df_base, volume_max, peso_max, ignorar_braco, converter_pac_para_u
                         "Braço": braco,
                         "volume": 0.0,
                         "peso": 0.0,
-                        "produtos": defaultdict(lambda: {"Qtd": 0})
+                        "produtos": defaultdict(lambda: {"Qtd": 0, "Descricao": descricao})
                     })
                     caixa_id_global += 1
 
@@ -143,12 +152,7 @@ def empacotar_3d(df_dados, comprimento_caixa, largura_caixa, altura_caixa, peso_
         volume_un = (row["Comprimento"] * row["Largura"] * row["Altura"]) / 1000
         peso_un = row["Peso bruto"] / 1000 if row["Unidade de peso"] == "G" else row["Peso bruto"]
         for _ in range(qtd):
-            itens.append({
-                "ID_Produto": row["Produto"],
-                "Volume": volume_un,
-                "Peso": peso_un,
-                "Descricao": row["Denominador"]
-            })
+            itens.append({"ID_Produto": row["Produto"], "Volume": volume_un, "Peso": peso_un, "Descricao": row["Denominador"]})
 
     caixas = []
     for item in sorted(itens, key=lambda x: x["Volume"], reverse=True):
@@ -184,20 +188,42 @@ if arquivo:
         df_base = pd.read_excel(arquivo, sheet_name="Base")
         df_mestre = pd.read_excel(arquivo, sheet_name="Dados.Mestre")
 
-        if st.button("🚀 Gerar Caixas (FFD 2D)"):
-            st.session_state.df_resultado = empacotar(df_base.copy(), volume_temp, peso_temp, ignorar_braco, converter_pac_para_un)
-            st.info(f"📦 FFD gerou: {st.session_state.df_resultado['ID_Caixa'].nunique()} caixas.")
+        if st.button("🚀 Gerar Caixas (Comparar FFD x BFD)"):
+            st.session_state.volume_maximo = volume_temp
+            st.session_state.peso_maximo = peso_temp
+
+            df_ffd = empacotar(df_base.copy(), volume_temp, peso_temp, ignorar_braco, converter_pac_para_un, metodo="FFD")
+            df_bfd = empacotar(df_base.copy(), volume_temp, peso_temp, ignorar_braco, converter_pac_para_un, metodo="BFD")
+
+            total_ffd = df_ffd["ID_Caixa"].nunique()
+            total_bfd = df_bfd["ID_Caixa"].nunique()
+
+            st.info(f"📦 FFD gerou: {total_ffd} caixas | BFD gerou: {total_bfd} caixas")
+
+            if total_bfd < total_ffd:
+                st.session_state.df_resultado = df_bfd
+                metodo_usado = "BFD"
+            else:
+                st.session_state.df_resultado = df_ffd
+                metodo_usado = "FFD"
+
+            st.success(f"🏆 Melhor resultado: {metodo_usado} com {st.session_state.df_resultado['ID_Caixa'].nunique()} caixas.")
+
             buffer = io.BytesIO()
             with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
-                st.session_state.df_resultado.to_excel(writer, sheet_name="Resumo Caixas 2D", index=False)
+                st.session_state.df_resultado.to_excel(writer, sheet_name="Resumo Caixas", index=False)
+
             st.download_button("📥 Baixar Relatório Excel (2D)", data=buffer.getvalue(), file_name="Simulacao_Caixas_2D.xlsx")
 
         if st.button("🚀 Gerar Caixas (3D)"):
-            st.session_state.df_resultado_3d = empacotar_3d(df_mestre.copy(), comprimento_caixa, largura_caixa, altura_caixa, peso_temp, ocupacao_maxima)
-            st.dataframe(st.session_state.df_resultado_3d)
+            df_3d = empacotar_3d(df_mestre.copy(), comprimento_caixa, largura_caixa, altura_caixa, peso_temp, ocupacao_maxima)
+            st.session_state.df_resultado_3d = df_3d
+            st.info(f"📦 Empacotamento 3D gerou: {df_3d['ID_Caixa'].nunique()} caixas.")
+
             buffer_3d = io.BytesIO()
             with pd.ExcelWriter(buffer_3d, engine="xlsxwriter") as writer:
                 st.session_state.df_resultado_3d.to_excel(writer, sheet_name="Resumo Caixas 3D", index=False)
+
             st.download_button("📥 Baixar Relatório Excel (3D)", data=buffer_3d.getvalue(), file_name="Simulacao_Caixas_3D.xlsx")
 
     except Exception as e:
