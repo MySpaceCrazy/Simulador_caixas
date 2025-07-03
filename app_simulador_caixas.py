@@ -137,13 +137,23 @@ def empacotar_3d(df_base, df_mestre, comprimento_caixa, largura_caixa, altura_ca
 
     # Junta a base com o mestre para pegar as dimensões corretas
     df_join = pd.merge(df_base, df_mestre, how='left', left_on=['ID_Produto', 'Unidade med.altern.'], right_on=['Produto', 'UM alternativa'])
-    df_join = df_join.dropna(subset=['Comprimento', 'Largura', 'Altura'])
+    
+    # Aviso se o merge não trouxe resultados
+    if df_join.empty:
+        st.warning("⚠️ Atenção: Não houve correspondência no merge. Verifique se os campos 'ID_Produto' e 'UM alternativa' estão corretos.")
 
+    # Filtra registros que têm dimensões válidas
+    df_join = df_join.dropna(subset=['Comprimento', 'Largura', 'Altura'])
+    
     itens = []
     for _, row in df_join.iterrows():
         qtd = int(row["Qtd.prev.orig.UMA"])
         volume_un = (row["Comprimento"] * row["Largura"] * row["Altura"]) / 1000
-        peso_un = row["Peso bruto"] / 1000 if row["Unidade de peso"] == "G" else row["Peso bruto"]
+        peso_bruto = row.get("Peso bruto", 0) or 0
+        unidade_peso = str(row.get("Unidade de peso", "")).upper()
+        
+        peso_un = (peso_bruto / 1000) if unidade_peso == "G" else peso_bruto
+
         for _ in range(qtd):
             itens.append({
                 "ID_Produto": row["ID_Produto"],
