@@ -64,10 +64,17 @@ def empacotar(df_base, volume_max, peso_max, ignorar_braco, converter_pac_para_u
     df_base["Peso de carga"] = pd.to_numeric(df_base["Peso de carga"], errors="coerce").fillna(0)
     df_base["Volume de carga"] = pd.to_numeric(df_base["Volume de carga"], errors="coerce").fillna(0)
     df_base["Qtd.prev.orig.UMA"] = pd.to_numeric(df_base["Qtd.prev.orig.UMA"], errors="coerce").fillna(1)
+
     df_base.loc[df_base["Unidade de peso"] == "G", "Peso de carga"] /= 1000
 
+    # Corrige valores inválidos
     df_base["Volume unitário"] = df_base["Volume de carga"] / df_base["Qtd.prev.orig.UMA"]
     df_base["Peso unitário"] = df_base["Peso de carga"] / df_base["Qtd.prev.orig.UMA"]
+    df_base["Volume unitário"] = df_base["Volume unitário"].replace([float('inf'), -float('inf')], 0).fillna(0)
+    df_base["Peso unitário"] = df_base["Peso unitário"].replace([float('inf'), -float('inf')], 0).fillna(0)
+
+    # Remove itens com volume ou peso nulo
+    df_base = df_base[(df_base["Volume unitário"] > 0) & (df_base["Peso unitário"] > 0)]
 
     agrupadores = ["ID_Loja"]
     if not ignorar_braco and "Braço" in df_base.columns:
@@ -94,8 +101,8 @@ def empacotar(df_base, volume_max, peso_max, ignorar_braco, converter_pac_para_u
             while qtd_restante > 0:
                 melhor_idx = -1
                 for idx, cx in enumerate(caixas):
-                    max_un_volume = int((volume_max - cx["volume"]) // volume_unit) if volume_unit > 0 else qtd_restante
-                    max_un_peso = int((peso_max - cx["peso"]) // peso_unit) if peso_unit > 0 else qtd_restante
+                    max_un_volume = int((volume_max - cx["volume"]) // volume_unit) if volume_unit > 0 else 0
+                    max_un_peso = int((peso_max - cx["peso"]) // peso_unit) if peso_unit > 0 else 0
                     max_unidades = min(qtd_restante, max_un_volume, max_un_peso)
                     if max_unidades > 0:
                         melhor_idx = idx
