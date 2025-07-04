@@ -243,3 +243,16 @@ if arquivo_usado is not None:
 
     except Exception as e:
         st.error(f"Erro no processamento: {e}")
+
+
+# --- Seção Autor ---
+
+st.markdown("---")
+
+st.markdown("""
+    <div class="author">
+        <img src="https://avatars.githubusercontent.com/u/90271653?v=4" width="80">
+        <h3>Anderson Oliveira</h3>
+        <p>🔧 Desenvolvedor de soluções em logística e automações <br> 🌐 <a href="https://github.com/MySpaceCrazy" target="_blank">GitHub</a> | <a href="https://www.linkedin.com/in/seulinkedin" target="_blank">LinkedIn</a></p>
+    </div>
+""", unsafe_allow_html=True) 
