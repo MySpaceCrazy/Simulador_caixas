@@ -277,21 +277,22 @@ st.markdown("""
     }
 </style>
 
-    <div class="author">
-        <img src="https://avatars.githubusercontent.com/u/90271653?v=4" alt="Autor">
-            <div  class="author-name">
-                </p>Ânderson Oliveira</p>
-            </div>    
-        <p>Engenheiro de Dados</p>
-        <p>Análise e Desenvolvimento de Sistemas</p>
-        <p>Desenvolvedor de soluções em logística e automações</p>
-        <div style="margin: 10px 0;">
-            <a href="https://github.com/MySpaceCrazy" target="_blank">
-                <img src="https://raw.githubusercontent.com/MySpaceCrazy/Simulador_caixas_2D/refs/heads/main/github.ico" alt="GitHub" style="width: 32px; height: 32px; margin-right: 10px;">
-            </a>
-            <a href="https://www.linkedin.com/in/%C3%A2nderson-matheus-flores-de-oliveira-5b92781b4" target="_blank">
-                <img src="https://raw.githubusercontent.com/MySpaceCrazy/Simulador_caixas_2D/refs/heads/main/linkedin.ico" alt="LinkedIn" style="width: 32px; height: 32px;">
-            </a>
-        </div>
+<div class="author">
+    <img src="https://avatars.githubusercontent.com/u/90271653?v=4" alt="Autor">
+    <div class="author-name">
+        <p>Ânderson Oliveira</p>
+    </div>    
+    <p>Engenheiro de Dados</p>
+    <p>Análise e Desenvolvimento de Sistemas</p>
+    <p>Desenvolvedor de soluções em logística e automações</p>
+    <div style="margin: 10px 0;">
+        <a href="https://github.com/MySpaceCrazy" target="_blank">
+            <img src="https://raw.githubusercontent.com/MySpaceCrazy/Simulador_caixas_2D/refs/heads/main/github.ico" alt="GitHub" style="width: 32px; height: 32px; margin-right: 10px;">
+        </a>
+        <a href="https://www.linkedin.com/in/%C3%A2nderson-matheus-flores-de-oliveira-5b92781b4" target="_blank">
+            <img src="https://raw.githubusercontent.com/MySpaceCrazy/Simulador_caixas_2D/refs/heads/main/linkedin.ico" alt="LinkedIn" style="width: 32px; height: 32px;">
+        </a>
+    </div>
+</div>
 """, unsafe_allow_html=True) 
 
