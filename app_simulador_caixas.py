@@ -246,13 +246,14 @@ if arquivo_usado is not None:
 
 
 # --- Seção Autor ---
-
-st.markdown("---")
-
-st.markdown("""
-    <div class="author">
-        <img src="https://avatars.githubusercontent.com/u/90271653?v=4" width="80">
-        <h3>Anderson Oliveira</h3>
-        <p>🔧 Desenvolvedor de soluções em logística e automações <br> 🌐 <a href="https://github.com/MySpaceCrazy" target="_blank">GitHub</a> | <a href="https://www.linkedin.com/in/seulinkedin" target="_blank">LinkedIn</a></p>
-    </div>
-""", unsafe_allow_html=True) 
+col6 = st.columns(1)
+with col6:
+    st.markdown("---")
+    
+    st.markdown("""
+        <div class="author">
+            <img src="https://avatars.githubusercontent.com/u/90271653?v=4" width="80">
+            <h3>Anderson Oliveira</h3>
+            <p>🔧 Desenvolvedor de soluções em logística e automações <br> 🌐 <a href="https://github.com/MySpaceCrazy" target="_blank">GitHub</a> | <a href="https://www.linkedin.com/in/seulinkedin" target="_blank">LinkedIn</a></p>
+        </div>
+    """, unsafe_allow_html=True) 
