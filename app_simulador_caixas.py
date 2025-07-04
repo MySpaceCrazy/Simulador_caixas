@@ -249,9 +249,48 @@ st.markdown("---")
 # --- Seção Autor ---
 col6 = st.columns(1)
 st.markdown("""
+<style>
+.author {
+    padding: 40px 20px;
+    text-align: center;
+    background-color: #000000;
+    color: white;
+}
+
+.author img {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+}
+
+.author p {
+    margin-top: 15px;
+    font-size: 1rem;
+}
+</style>
+
+<style>
+    .author-name {
+        font-weight: bold;
+        font-size: 1.4rem;
+        color: white;
+    }
+</style>
+
     <div class="author">
-        <img src="https://avatars.githubusercontent.com/u/90271653?v=4" width="80">
-        <h3>Anderson Oliveira</h3>
-        <p>🔧 Desenvolvedor de soluções em logística e automações <br> 🌐 <a href="https://github.com/MySpaceCrazy" target="_blank">GitHub</a> | <a href="https://www.linkedin.com/in/seulinkedin" target="_blank">LinkedIn</a></p>
-    </div>
+        <img src="https://avatars.githubusercontent.com/u/90271653?v=4" alt="Autor">
+            <div  class="author-name">
+                </p>Ânderson Oliveira</p>
+            </div>    
+        <p>Engenheiro de Dados</p>
+        <p>Análise e Desenvolvimento de Sistemas</p>
+        <p>Desenvolvedor de soluções em logística e automações</p>
+        <div style="margin: 10px 0;">
+            <a href="https://github.com/MySpaceCrazy" target="_blank">
+                <img src="images/IMG/github.png" alt="GitHub" style="width: 32px; height: 32px; margin-right: 10px;">
+            </a>
+            <a href="https://www.linkedin.com/in/%C3%A2nderson-matheus-flores-de-oliveira-5b92781b4" target="_blank">
+                <img src="images/IMG/linkedin.png" alt="LinkedIn" style="width: 32px; height: 32px;">
+            </a>
+        </div>
 """, unsafe_allow_html=True) 
