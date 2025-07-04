@@ -243,8 +243,8 @@ if arquivo_usado is not None:
 
     except Exception as e:
         st.error(f"Erro no processamento: {e}")
-
- st.markdown("---")
+        
+st.markdown("---")
 
 # --- Seção Autor ---
 col6 = st.columns(1)
