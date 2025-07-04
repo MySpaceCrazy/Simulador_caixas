@@ -244,12 +244,11 @@ if arquivo_usado is not None:
     except Exception as e:
         st.error(f"Erro no processamento: {e}")
 
+ st.markdown("---")
 
 # --- Seção Autor ---
 col6 = st.columns(1)
 with col6:
-    st.markdown("---")
-    
     st.markdown("""
         <div class="author">
             <img src="https://avatars.githubusercontent.com/u/90271653?v=4" width="80">
