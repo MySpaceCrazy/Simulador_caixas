@@ -282,9 +282,7 @@ st.markdown("""
     <div class="author-name">
         <p>Ânderson Oliveira</p>
     </div>    
-    <p>Engenheiro de Dados</p>
-    <p>Análise e Desenvolvimento de Sistemas</p>
-    <p>Desenvolvedor de soluções em logística e automações</p>
+    <p>Engenheiro de Dados | Soluções Logísticas | Automações</p>
     <div style="margin: 10px 0;">
         <a href="https://github.com/MySpaceCrazy" target="_blank">
             <img src="https://raw.githubusercontent.com/MySpaceCrazy/Simulador_caixas_2D/refs/heads/main/github.ico" alt="GitHub" style="width: 32px; height: 32px; margin-right: 10px;">
