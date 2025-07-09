@@ -6,4 +6,3 @@ openpyxl
 xlsxwriter
 xlrd
 pathlib
-sqlite3
